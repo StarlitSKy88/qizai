@@ -18,9 +18,14 @@ export function diversityScore(personas: Array<{ stance_label: string }>): numbe
   return score === 0 ? 0 : score;
 }
 
-export function shouldTriggerBoost(text: string, mean: number, std: number): boolean {
+export function shouldTriggerBoost(
+  text: string,
+  mean: number,
+  std: number,
+  threshold: number = 2.0
+): boolean {
   if (std === 0) return false;
   const zScore = Math.abs((text.length - mean) / std);
-  // z-score > 2.0 (使用 >= 2 - epsilon 处理浮点精度问题)
-  return zScore >= 2.0 - 1e-10;
+  // z-score >= threshold (使用 >= threshold - epsilon 处理浮点精度问题)
+  return zScore >= threshold - 1e-10;
 }

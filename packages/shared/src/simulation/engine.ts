@@ -96,14 +96,17 @@ export class SimulationEngine {
     const variance = outputs.reduce((s, o) => s + Math.pow(o.reaction.length - mean, 2), 0) / outputs.length;
     const std = Math.sqrt(variance);
 
+    // 让 boostThreshold 配置生效：默认 2.0（z-score），可通过 options.boostThreshold 调整
+    const boostThreshold = this.options.boostThreshold ?? 2.0;
+
     const boosted: SimulationOutput[] = [];
 
     for (let i = 0; i < outputs.length; i++) {
       const output = outputs[i];
       const persona = personas[i];
 
-      if (shouldTriggerBoost(output.reaction, mean, std)) {
-        const boostPrompt = buildBoostPrompt(persona, output.reaction, 95);
+      if (shouldTriggerBoost(output.reaction, mean, std, boostThreshold)) {
+        const boostPrompt = buildBoostPrompt(persona, output.reaction, 95, content);
         const newReaction = await this.options.router.complete(boostPrompt, persona);
         boosted.push({
           personaId: output.personaId,
