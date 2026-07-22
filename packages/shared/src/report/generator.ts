@@ -5,16 +5,61 @@ import { decideRecommendation } from './decision';
 import { buildEvidence } from './evidence';
 import { checkReportSafety } from './guards';
 
+// 中立标记（用于标记已剥离的 negation 上下文）
+const NEG_MARK = 'NEG';
+
+/**
+ * 中文 sentiment 启发式（修复双重计数）：
+ *   - "差" / "negative" / "不好" / "不赞" / "不赞同" 一律归为 negative
+ *   - "好" / "赞" / "positive" 在 non-negation 上下文中归为 positive
+ *   - 其他默认 neutral
+ *
+ * 实现：先把否定短语（"不[好赞]"/"别[好赞]"/"非[好赞]"）替换成一个独占的
+ * NEG_MARK 哨兵，然后在剥离后的文本上判断 positive 关键字。如果存在 NEG_MARK
+ * 且文本原本含 positive 标记，则归为 negative（避免"不好"/"不赞"被同时
+ * 计入 positive 和 negative）。
+ */
+function classifyReaction(reaction: string): 'positive' | 'negative' | 'neutral' {
+  const text = reaction;
+
+  const hasNegativeKeyword =
+    text.includes('negative') ||
+    text.includes('差') ||
+    /不[好赞]/.test(text) ||
+    /别[好赞]/.test(text) ||
+    /非[好赞]/.test(text);
+
+  if (hasNegativeKeyword) {
+    return 'negative';
+  }
+
+  const stripped = text
+    .replace(/不[好赞]/g, NEG_MARK)
+    .replace(/别[好赞]/g, NEG_MARK)
+    .replace(/非[好赞]/g, NEG_MARK);
+
+  const hasPositiveKeyword =
+    !stripped.includes(NEG_MARK) &&
+    (text.includes('positive') || text.includes('好') || text.includes('赞'));
+
+  if (hasPositiveKeyword) {
+    return 'positive';
+  }
+
+  return 'neutral';
+}
+
 export class ReportGenerator {
   generate(content: ContentData, result: SimulationResult): Report {
     const sampleSize = result.outputs.length;
 
-    const positiveCount = result.outputs.filter(o =>
-      o.reaction.includes('positive') || o.reaction.includes('好') || o.reaction.includes('赞')
-    ).length;
-    const negativeCount = result.outputs.filter(o =>
-      o.reaction.includes('negative') || o.reaction.includes('差') || o.reaction.includes('不')
-    ).length;
+    let positiveCount = 0;
+    let negativeCount = 0;
+    for (const o of result.outputs) {
+      const cls = classifyReaction(o.reaction);
+      if (cls === 'positive') positiveCount++;
+      else if (cls === 'negative') negativeCount++;
+    }
     const neutralCount = sampleSize - positiveCount - negativeCount;
 
     const positiveRatio = sampleSize === 0 ? 0 : positiveCount / sampleSize;
