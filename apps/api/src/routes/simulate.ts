@@ -17,14 +17,22 @@ simulateRouter.post('/', async (c) => {
   const builder = new PersonaBuilder();
   const personas = builder.buildBalanced({ topic: content.title, count: persona_count });
 
-  const isTest = process.env.NODE_ENV === 'test';
-  const env = c.env as { ALIBABA_BAILIAN_API_KEY?: string; FIREWORKS_API_KEY?: string; DEEPSEEK_API_KEY?: string };
+  // Cloudflare Workers 中必须通过 c.env 访问环境变量；process.env 在 Workers 中不安全。
+  // 本地 Node 测试环境 c.env 可能未注入，故显式 fallback 到 process.env 以维持向后兼容。
+  const env = c.env as {
+    NODE_ENV?: string;
+    ALIBABA_BAILIAN_API_KEY?: string;
+    FIREWORKS_API_KEY?: string;
+    DEEPSEEK_API_KEY?: string;
+  };
+  const nodeEnv = env?.NODE_ENV ?? (typeof process !== 'undefined' ? process.env?.NODE_ENV : undefined);
+  const isTest = nodeEnv === 'test';
   const router = isTest
     ? createMockRouter()
     : new LLMRouter({
-        alibabaKey: env.ALIBABA_BAILIAN_API_KEY ?? '',
-        fireworksKey: env.FIREWORKS_API_KEY ?? '',
-        deepseekKey: env.DEEPSEEK_API_KEY ?? '',
+        alibabaKey: env?.ALIBABA_BAILIAN_API_KEY ?? '',
+        fireworksKey: env?.FIREWORKS_API_KEY ?? '',
+        deepseekKey: env?.DEEPSEEK_API_KEY ?? '',
       });
 
   const engine = new SimulationEngine({
