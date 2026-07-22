@@ -1,0 +1,21 @@
+{
+  "name": "@qizai/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "@qizai/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "^3.80.0",
+    "@cloudflare/workers-types": "^4.20240919.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  }
+}

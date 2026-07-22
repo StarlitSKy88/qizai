@@ -1,0 +1,7 @@
+name = "qizai-api"
+main = "src/index.ts"
+compatibility_date = "2026-07-23"
+[vars]
+ALIBABA_BAILIAN_MODEL = "qwen3.5-flash"
+FIREWORKS_MODEL = "qwen3p7-plus"
+DEEPSEEK_MODEL = "deepseek-v4-flash"
