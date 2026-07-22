@@ -28,6 +28,6 @@ npx wrangler deploy
 echo "构建并部署 Web..."
 cd /Users/opc-1/Downloads/O/qizai/apps/web
 pnpm run build
-npx wrangler pages deploy ../web/dist --project-name qizai-web --branch main
+npx wrangler pages deploy ../web/dist --project-name qizai-web
 
 echo "✅ 部署完成！"
