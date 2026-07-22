@@ -10,3 +10,6 @@ out/
 *.log
 coverage/
 .DS_Store
+
+# SDD scratch (Subagent-Driven Development progress ledger)
+.superpowers/
