@@ -131,3 +131,36 @@
 ---
 
 **Recovery Note**: 本 ledger 是 git-tracked 的进度恢复锚点。context 压缩后，从 git log + 本文件恢复状态。
+
+---
+
+## v0.13.A Subagent-Driven Progress (2026-07-23)
+
+**Plan**: `docs/superpowers/plans/2026-07-23-qizai-v013a-homepage-hero.md`
+**Base commit**: 3a383e8
+**Mode**: Subagent-Driven (per-task implementer + reviewer)
+
+| # | Task | Status | Commits | Review |
+|---|------|--------|---------|--------|
+| 1 | Vite scaffold | ✅ complete | 9ffbb72 | Spec ✅ / Quality Approved |
+| 2 | liquid-glass CSS | 🔄 in_progress | - | - |
+| 3 | VideoBackground | ⏳ pending | - | - |
+| 4 | NavBar/HeroContent/SocialFooter | ⏳ pending | - | - |
+| 5 | Hero assembly | ⏳ pending | - | - |
+
+| 2 | liquid-glass CSS | ✅ complete | 50d682d | Spec ✅ / Quality Approved (5 tests pass) |
+| 3 | VideoBackground | ✅ complete | dbb6a15 | Spec ✅ / Quality Approved (4 tests pass; fake-timers adapt accepted) |
+| 4 | NavBar/HeroContent/SocialFooter | ✅ complete | 1b18414 | Spec ✅ / Quality Approved (14 tests pass, 25 total; 2 verbatim test defects fixed) |
+| 5 | Hero assembly | ✅ complete | ed9007d | Spec ✅ / Quality Approved (27 tests pass, dist/ verified) |
+| Final | Final whole-branch review | ✅ complete | (review) | ⚠️ → ✅ — H1 declarative (spec/plan conflict, code follows plan; visual equivalent) + H2 fixed at 66577ac |
+| Final fix | deploy.sh H2 fix | ✅ complete | 66577ac | Removed `--branch main` deprecated wrangler flag |
+
+## v0.13.A Final Stats
+
+- **7 commits** total (1 plan + 5 Task + 1 fix)
+- **27 tests pass** across 7 test files
+- **typecheck clean** (tsc --noEmit exit 0)
+- **dist/** produced (149 KB JS + 9 KB CSS, 1581 modules)
+- **12/12 spec sections covered** in review
+- **0 scope creep** (no react-router / multi-route / LLM API / AntD / framer-motion / state mgmt)
+- **READY TO MERGE / TAG v0.13.0**

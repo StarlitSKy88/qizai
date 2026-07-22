@@ -80,3 +80,91 @@ qizai/
 - vitest 2.x
 
 [0.12.0]: https://github.com/qq38785/qizai/releases/tag/v0.12.0
+
+---
+
+## [Unreleased] - v0.13.A（首页 Hero 重写）
+
+### Highlights
+
+qizai v0.13.A — apps/web 从 Next.js 14 App Router 重写为 Vite 5 + React 18 单屏首页 hero。
+
+- **7 commits**：5 Task 实现 + 1 final fix（H2 wrangler `--branch` deprecated）+ 1 docs/plan anchor
+- **27/27 tests pass**（vitest + jsdom + @testing-library/react + jest-dom + user-event）
+- **typecheck clean**（tsc --noEmit）
+- **build 产出 dist/**：149 KB JS（gzip 48 KB）+ 9 KB CSS（gzip 2.67 KB）
+- **12/12 spec 章节 100% 覆盖**（spec §一-§十二）
+- **0 scope creep**：无 react-router / 无多路由 / 无真实 LLM API / 无 AntD/Chakra/shadcn / 无 framer-motion / 无 state management
+- **设计资产 verbatim 移植**：
+  - Liquid Glass CSS（spec §六）：`.liquid-glass` + `::before` gradient + mask trick
+  - RAF fade 系统（spec §五.5.1）：500ms fade-in / fade-out 0.55s 触发 / 100ms gap before reset
+  - 中文文案（spec §二）："你的内容会爆吗？" / "先问 1000 个 persona..." / "了解工作原理" / "开始预测" / "登录" / "功能/定价/关于"
+  - 视频：cloudfront URL verbatim，Phase 2 上线前下载到 local
+
+### 🚀 Features
+
+- **monorepo plan + spec**：v0.13.A spec & plan (`3a383e8`)
+- **web (scaffold)**：Vite 5 + React 18 + TS 5.6 strict + Tailwind 3 + lucide-react 脚手架 (`9ffbb72`)
+- **web (liquid-glass)**：Liquid Glass CSS 类 + 5 单元测试 (`50d682d`)
+- **web (video)**：VideoBackground 组件 + RAF fade-in/out 循环 + fake-timers 测试 + 4 时序测试 (`dbb6a15`)
+- **web (components)**：NavBar / HeroContent / SocialFooter + 14 测试，verbatim 采用 spec §二中文 (`1b18414`)
+- **web (hero)**：Hero 组装 + App.tsx 接入 + apps/web/README.md (`ed9007d`)
+- **deploy**：wrangler pages deploy 路径 `out` → `dist` (`ed9007d` + `66577ac`)
+
+### 🐛 Bug Fixes
+
+- **web (tests)**：HeroContent 2 处 verbatim 测试缺陷（JSDOM 单引号规范化 / aria-less ArrowRight querySelector 自相矛盾）通过 direction (a) 修正测试断言方向，组件 production code 100% verbatim (`1b18414`)
+- **web (config)**：vitest.config.ts 补 `setupFiles: ['./test/setup.ts']`（Task 1 遗留；Task 4 implementer 发现并修复，`1b18414`）
+
+### ⚙️ Miscellaneous
+
+- **deploy (cleanup)**：移除 `wrangler pages deploy --branch main`（v3 deprecated flag）(`66577ac`)
+
+### Architecture
+
+```
+qizai/
+├── apps/
+│   ├── web/        # Vite + React 18 单屏 SPA（v0.13.A）
+│   └── api/        # Cloudflare Workers + Hono（v0.12 保留）
+├── packages/
+│   └── shared/     # persona / llm / simulation / platform / report（v0.12 保留）
+├── docs/
+│   ├── superpowers/specs/2026-07-23-qizai-v013a-homepage-hero.md
+│   └── superpowers/plans/2026-07-23-qizai-v013a-homepage-hero.md
+└── scripts/
+    └── deploy.sh   # wrangler pages deploy ../web/dist
+```
+
+### Known TODOs（v0.13.B out-of-scope，待推进）
+
+- react-router v6 多路由（`/predict` 内容提交 + `/about` + `/pricing`）
+- 小红书 / 抖音 / B站 品牌 SVG（v0.13.A 占位用 Globe + aria-label）
+- 视频本地化（上线前下载到 `apps/web/public/videos/hero.mp4`，替换 cloudfront URL）
+- 真实 LLM API 接入（`/predict` 后端 worker）
+- 用户登录 / JWT
+- D1 数据库 schema（用户 + 历史报告）
+
+### Dependencies
+
+**新增（v0.13.A）**：
+- vite ^5.4.x
+- @vitejs/plugin-react ^4.3.x
+- react ^18.3.x + react-dom ^18.3.x
+- lucide-react ^0.460.0
+- @testing-library/jest-dom ^7.0.0
+- @testing-library/user-event ^14.5.0
+- autoprefixer ^10.4.0 + postcss ^8.4.0 + tailwindcss ^3.4.0
+- vitest ^2.0.0 + jsdom ^29.x
+
+**删除（v0.13.A）**：
+- next ^14.2.x
+- @qizai/shared（v0.13.A 不调用）
+
+**保留（v0.12）**：
+- Cloudflare Workers + D1/KV/R2（apps/api）
+- Hono 4.x
+- qwen3.5-flash + Fireworks + DeepSeek（LLM Router）
+- TypeScript 5.6 strict mode
+
+[Unreleased]: https://github.com/qq38785/qizai/compare/v0.12.0...HEAD
