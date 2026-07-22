@@ -1,12 +1,11 @@
 import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
-  test: {
-    environment: 'node',
-  },
+  test: { environment: 'node' },
   resolve: {
     alias: {
-      '@qizai/shared': '/Users/opc-1/Library/pnpm/global/5/node_modules/@qizai/shared/src',
+      '@qizai/shared': path.resolve(__dirname, '../../packages/shared/src'),
     },
   },
 });
