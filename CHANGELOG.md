@@ -176,9 +176,9 @@ qizai v0.13.B.3 — apps/web 视频资源从 CloudFront CDN 切到本地 `public
 - **离线 dev 可用**：`pnpm dev` predev 钩子自动 fetch → 无需外网
 - **build 产物含 mp4**：`pnpm build` 复制 `public/videos/hero.mp4` 到 `dist/videos/hero.mp4`
 - **CF Pages 永久缓存**：`_headers` 配置 `Cache-Control: public, max-age=31536000, immutable`
-- **fail-hard**：视频缺失 / > 10MB / curl 失败 → exit 1，不静默黑屏
+- **fail-hard**：视频缺失 / > **25MB** / curl 失败 → exit 1，不静默黑屏
 - **0 npm 依赖**：bash + curl + grep + sed 全内置命令
-- **5 commits**：4 task + 1 docs
+- **6 commits**：4 task + 2 fix (threshold amendment + _headers deploy fix)
 - **27/27 tests pass**（VideoBackground URL 断言同步更新）
 
 ### 🚀 Features
@@ -187,11 +187,17 @@ qizai v0.13.B.3 — apps/web 视频资源从 CloudFront CDN 切到本地 `public
 - **scripts**: `scripts/fetch-video.sh` 幂等 fetch + 阈值检查（Task 1）
 - **components**: `VideoBackground.tsx` VIDEO_URL → HERO_VIDEO_LOCAL_URL（Task 2）
 - **hooks**: `predev` + `prebuild` npm hooks 自动触发 fetch（Task 3）
-- **headers**: `apps/web/_headers` CF Pages Cache-Control 配置（Task 4）
+- **headers**: `apps/web/public/_headers` CF Pages Cache-Control 配置（Task 4 + bfcd4a6 部署修复）
 - **docs**: `docs/superpowers/specs/source-of-truth.md` 视频资源台账（Task 4）
+
+### 🐛 Bug Fixes
+
+- **scripts**: HERO_VIDEO_MAX_SIZE 10MB → 25MB（真实 CloudFront 视频 20MB，10MB 阈值会让 dev/build 永久 fail-fast；user 昴君批准）(`c79d122`)
+- **config**: `_headers` 从 `apps/web/_headers` 移入 `apps/web/public/_headers`（Vite build 只 copy public/*，部署修复）(`bfcd4a6`)
 
 ### ⚙️ Miscellaneous
 
 - `.gitignore`: `apps/web/public/videos/` 加入（Task 3）
+- **spec retro-edit**: v0.14 cleanup — spec §三/§5.1/§5.3/§5.5/§六/§九/§十 + §十二 ADR 块，与代码 100% 对齐
 
 [Unreleased]: https://github.com/qq38785/qizai/compare/v0.12.0...HEAD
