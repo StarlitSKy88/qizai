@@ -13,3 +13,4 @@ coverage/
 
 # SDD scratch (Subagent-Driven Development progress ledger)
 .superpowers/
+graphify-out/
