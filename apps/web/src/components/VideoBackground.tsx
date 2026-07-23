@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
+import { HERO_VIDEO_LOCAL_URL, HERO_VIDEO_SOURCE_URL } from '../constants/videos';
 
-const VIDEO_URL =
-  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_115001_bcdaa3b4-03de-47e7-ad63-ae3e392c32d4.mp4';
+const VIDEO_URL = HERO_VIDEO_LOCAL_URL;
 
 const FADE_DURATION_MS = 500;
 const FADE_OUT_TRIGGER_S = 0.55;

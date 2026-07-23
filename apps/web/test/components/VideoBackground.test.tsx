@@ -42,9 +42,7 @@ describe('VideoBackground', () => {
     const { container } = render(<VideoBackground />);
     const video = container.querySelector('video');
     expect(video).toBeTruthy();
-    expect(video?.getAttribute('src')).toBe(
-      'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_115001_bcdaa3b4-03de-47e7-ad63-ae3e392c32d4.mp4'
-    );
+    expect(video?.getAttribute('src')).toBe('/videos/hero.mp4');
     const wrap = container.firstChild as HTMLElement;
     expect(wrap.className).toContain('min-h-screen');
     expect(wrap.className).toContain('bg-black');
