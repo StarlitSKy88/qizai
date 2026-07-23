@@ -167,4 +167,31 @@ qizai/
 - qwen3.5-flash + Fireworks + DeepSeek（LLM Router）
 - TypeScript 5.6 strict mode
 
+## [Unreleased] - v0.13.B.3（视频本地化）
+
+### Highlights
+
+qizai v0.13.B.3 — apps/web 视频资源从 CloudFront CDN 切到本地 `public/videos/hero.mp4`。
+
+- **离线 dev 可用**：`pnpm dev` predev 钩子自动 fetch → 无需外网
+- **build 产物含 mp4**：`pnpm build` 复制 `public/videos/hero.mp4` 到 `dist/videos/hero.mp4`
+- **CF Pages 永久缓存**：`_headers` 配置 `Cache-Control: public, max-age=31536000, immutable`
+- **fail-hard**：视频缺失 / > 10MB / curl 失败 → exit 1，不静默黑屏
+- **0 npm 依赖**：bash + curl + grep + sed 全内置命令
+- **5 commits**：4 task + 1 docs
+- **27/27 tests pass**（VideoBackground URL 断言同步更新）
+
+### 🚀 Features
+
+- **constants**: `apps/web/src/constants/videos.ts` 单一事实源（SOURCE_URL / LOCAL_URL / WARN/MAX_SIZE） (Task 1)
+- **scripts**: `scripts/fetch-video.sh` 幂等 fetch + 阈值检查（Task 1）
+- **components**: `VideoBackground.tsx` VIDEO_URL → HERO_VIDEO_LOCAL_URL（Task 2）
+- **hooks**: `predev` + `prebuild` npm hooks 自动触发 fetch（Task 3）
+- **headers**: `apps/web/_headers` CF Pages Cache-Control 配置（Task 4）
+- **docs**: `docs/superpowers/specs/source-of-truth.md` 视频资源台账（Task 4）
+
+### ⚙️ Miscellaneous
+
+- `.gitignore`: `apps/web/public/videos/` 加入（Task 3）
+
 [Unreleased]: https://github.com/qq38785/qizai/compare/v0.12.0...HEAD
