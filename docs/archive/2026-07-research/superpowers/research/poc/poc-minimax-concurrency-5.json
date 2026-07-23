@@ -1,0 +1,275 @@
+{
+  "concurrency": 5,
+  "model": "MiniMax-M3",
+  "content_types": [
+    "美妆",
+    "美食",
+    "职场",
+    "萌宠",
+    "旅游"
+  ],
+  "persona_count": 1000,
+  "rounds": 1,
+  "results_per_content": [
+    {
+      "content": "三招教你选对洗面奶",
+      "total_requests": 1000,
+      "successful": 451,
+      "failed": 549,
+      "wallclock_seconds": 1216.75,
+      "input_tokens": 45151,
+      "output_tokens": 8964,
+      "estimated_cost_cny": 0.2699,
+      "rate_limit_errors": 549,
+      "p50_latency_ms": 1383.5,
+      "p95_latency_ms": 3114.3,
+      "ttfb_p50_ms": 1383.5,
+      "ttfb_p95_ms": 3114.3,
+      "error_breakdown": {
+        "rate_limit": 549
+      },
+      "sample_failures": [
+        {
+          "pid": "P0026",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b02cd7dbecc0fa8261d0fb0c79a4ad'}"
+        },
+        {
+          "pid": "P0027",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b02cd7444a3ab691793e50070e53e3'}"
+        },
+        {
+          "pid": "P0028",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b02cd7bbdef65115a473d1202b1091'}"
+        },
+        {
+          "pid": "P0029",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b02cd75547dbfa75cb3342e03022d1'}"
+        },
+        {
+          "pid": "P0030",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b02cd7f06c5af6a7ea874e933d20f2'}"
+        }
+      ],
+      "content_id": "beauty",
+      "topic": "美妆"
+    },
+    {
+      "content": "在家做出米其林三星意面",
+      "total_requests": 1000,
+      "successful": 733,
+      "failed": 267,
+      "wallclock_seconds": 768.62,
+      "input_tokens": 72148,
+      "output_tokens": 17229,
+      "estimated_cost_cny": 0.4749,
+      "rate_limit_errors": 267,
+      "p50_latency_ms": 1394.2,
+      "p95_latency_ms": 2585.3,
+      "ttfb_p50_ms": 1394.2,
+      "ttfb_p95_ms": 2585.3,
+      "error_breakdown": {
+        "rate_limit": 267
+      },
+      "sample_failures": [
+        {
+          "pid": "P0000",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b03190bba8f225731badbfecc32f69'}"
+        },
+        {
+          "pid": "P0001",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b031907137958281a09b9900d81128'}"
+        },
+        {
+          "pid": "P0002",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b03190725d1bc0628e01f089fb2452'}"
+        },
+        {
+          "pid": "P0003",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b0319071dbf49f95068c9d9576a2d3'}"
+        },
+        {
+          "pid": "P0004",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b031907d2506b00ce5da83d47ee0db'}"
+        }
+      ],
+      "content_id": "food",
+      "topic": "美食"
+    },
+    {
+      "content": "面试时这三个问题千万别回答",
+      "total_requests": 1000,
+      "successful": 865,
+      "failed": 135,
+      "wallclock_seconds": 538.43,
+      "input_tokens": 84251,
+      "output_tokens": 19964,
+      "estimated_cost_cny": 0.5522,
+      "rate_limit_errors": 135,
+      "p50_latency_ms": 1413.1,
+      "p95_latency_ms": 2567.6,
+      "ttfb_p50_ms": 1413.1,
+      "ttfb_p95_ms": 2567.6,
+      "error_breakdown": {
+        "rate_limit": 135
+      },
+      "sample_failures": [
+        {
+          "pid": "P0082",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b034aac523fbcb36d0f763b3675369'}"
+        },
+        {
+          "pid": "P0083",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b034aa577e1be2bca7a31e8a4b5342'}"
+        },
+        {
+          "pid": "P0084",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b034aa7db01ed432e58e70f179c721'}"
+        },
+        {
+          "pid": "P0085",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b034ab91be9a608312ab4bf6df5a60'}"
+        },
+        {
+          "pid": "P0086",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b034acee5f37032e70a85e675b0fb6'}"
+        }
+      ],
+      "content_id": "career",
+      "topic": "职场"
+    },
+    {
+      "content": "猫咪这五种行为说明它超爱你",
+      "total_requests": 1000,
+      "successful": 869,
+      "failed": 131,
+      "wallclock_seconds": 534.86,
+      "input_tokens": 84406,
+      "output_tokens": 17520,
+      "estimated_cost_cny": 0.516,
+      "rate_limit_errors": 131,
+      "p50_latency_ms": 1358.2,
+      "p95_latency_ms": 2586.3,
+      "ttfb_p50_ms": 1358.2,
+      "ttfb_p95_ms": 2586.3,
+      "error_breakdown": {
+        "rate_limit": 131
+      },
+      "sample_failures": [
+        {
+          "pid": "P0093",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b036c64549e5b6f02c109f36178e63'}"
+        },
+        {
+          "pid": "P0094",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b036c7929a1c91880753cf345f93e4'}"
+        },
+        {
+          "pid": "P0095",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b036c779a2b93d4aa4dd7cc8d1aaec'}"
+        },
+        {
+          "pid": "P0096",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b036c78545d245d88f08b9846bf6c8'}"
+        },
+        {
+          "pid": "P0097",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b036c796b9811361feed72ea7238fa'}"
+        }
+      ],
+      "content_id": "pet",
+      "topic": "萌宠"
+    },
+    {
+      "content": "云南 7 天自由行攻略",
+      "total_requests": 1000,
+      "successful": 881,
+      "failed": 119,
+      "wallclock_seconds": 524.03,
+      "input_tokens": 85822,
+      "output_tokens": 18875,
+      "estimated_cost_cny": 0.5406,
+      "rate_limit_errors": 119,
+      "p50_latency_ms": 1372.5,
+      "p95_latency_ms": 2709.0,
+      "ttfb_p50_ms": 1372.5,
+      "ttfb_p95_ms": 2709.0,
+      "error_breakdown": {
+        "rate_limit": 119
+      },
+      "sample_failures": [
+        {
+          "pid": "P0100",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b038e4dc153a4c1899f2093ef1a9ec'}"
+        },
+        {
+          "pid": "P0101",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b038e4750f5fa68b11b3d41d6bff6f'}"
+        },
+        {
+          "pid": "P0102",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b038e4a2abc9a2f19f60ec88a28ad4'}"
+        },
+        {
+          "pid": "P0103",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b038e4fdb16c4c989d68edaa950219'}"
+        },
+        {
+          "pid": "P0104",
+          "error_code": "rate_limit",
+          "error": "Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': '已达到 Token Plan 速率限制：请升级 Token Plan 套餐或切换为按量付费 API 使用。 (2062)'}, 'request_id': '06b038e5d6365ec2e24cae906d557094'}"
+        }
+      ],
+      "content_id": "travel",
+      "topic": "旅游"
+    }
+  ],
+  "summary": {
+    "total_wallclock_seconds": 3582.7,
+    "total_input_tokens": 371778,
+    "total_output_tokens": 82552,
+    "total_cost_cny": 2.3536,
+    "total_requests": 5000,
+    "total_successful": 3799,
+    "total_failed": 1201,
+    "overall_error_rate": 0.2402,
+    "rate_limit_errors": 1201,
+    "p50_latency_ms_across_contents": 1384.3,
+    "p95_latency_ms_across_contents": 2712.5,
+    "speedup_vs_concurrency_1": null,
+    "spec_assumption_minutes": "5-15",
+    "spec_assumption_minutes_min": 5,
+    "spec_assumption_minutes_max": 15
+  },
+  "meta": {
+    "timestamp": "2026-07-23 02:11:17",
+    "input_price_cny_per_m": 3.0,
+    "output_price_cny_per_m": 15.0,
+    "concurrency": 5,
+    "n_personas": 1000,
+    "base_url": "https://api.minimaxi.com/anthropic"
+  }
+}

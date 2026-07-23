@@ -1,0 +1,170 @@
+{
+  "metadata": {
+    "mode": "mock",
+    "seed": 42,
+    "date": "2026-07-23",
+    "n_personas": 500,
+    "n_conservative_gt": 10,
+    "n_extreme_gt": 10,
+    "n_general_gt": 30
+  },
+  "param_sweep": {
+    "TAIL_PERSONA_RATIO=0.1": {
+      "param_name": "TAIL_PERSONA_RATIO",
+      "param_value": 0.1,
+      "liberal_coverage": 1.0,
+      "liberal_bias_degree": -0.11702417193510595,
+      "extreme_capture": 0.35714285714285715,
+      "reversion_degree": 0.0,
+      "diversity": 0.8303775954973069
+    },
+    "TAIL_PERSONA_RATIO=0.2": {
+      "param_name": "TAIL_PERSONA_RATIO",
+      "param_value": 0.2,
+      "liberal_coverage": 1.0,
+      "liberal_bias_degree": -0.08421286550407381,
+      "extreme_capture": 0.3485714285714286,
+      "reversion_degree": 0.0,
+      "diversity": 0.8585549286233158
+    },
+    "TAIL_PERSONA_RATIO=0.3": {
+      "param_name": "TAIL_PERSONA_RATIO",
+      "param_value": 0.3,
+      "liberal_coverage": 1.0,
+      "liberal_bias_degree": -0.05789409463319889,
+      "extreme_capture": 0.36000000000000004,
+      "reversion_degree": 0.0,
+      "diversity": 0.8911397369065197
+    },
+    "TAIL_PERSONA_RATIO=0.4": {
+      "param_name": "TAIL_PERSONA_RATIO",
+      "param_value": 0.4,
+      "liberal_coverage": 1.0,
+      "liberal_bias_degree": -0.031243060278214996,
+      "extreme_capture": 0.3057142857142857,
+      "reversion_degree": 0.0,
+      "diversity": 0.8739464359637784
+    },
+    "temperature=0.5": {
+      "param_name": "temperature",
+      "param_value": 0.5,
+      "liberal_coverage": 1.0,
+      "liberal_bias_degree": -0.059134965396764994,
+      "extreme_capture": 0.37428571428571433,
+      "reversion_degree": 0.0,
+      "diversity": 0.8996989222177043
+    },
+    "temperature=0.7": {
+      "param_name": "temperature",
+      "param_value": 0.7,
+      "liberal_coverage": 1.0,
+      "liberal_bias_degree": -0.06017878340198063,
+      "extreme_capture": 0.3685714285714286,
+      "reversion_degree": 0.0,
+      "diversity": 0.8927233456997828
+    },
+    "temperature=0.9": {
+      "param_name": "temperature",
+      "param_value": 0.9,
+      "liberal_coverage": 1.0,
+      "liberal_bias_degree": -0.058174855068140685,
+      "extreme_capture": 0.3542857142857143,
+      "reversion_degree": 0.0,
+      "diversity": 0.8819511639597416
+    },
+    "DIVERSITY_THRESHOLD=0.1": {
+      "param_name": "DIVERSITY_THRESHOLD",
+      "param_value": 0.1,
+      "collapse_rate": 0.01910831485629464,
+      "trip_rate": 0.0,
+      "diversity_curve": [
+        0.8889484766981598,
+        0.8736076771787978,
+        0.8634208170483202,
+        0.8614860055007195,
+        0.8719621693143879
+      ]
+    },
+    "DIVERSITY_THRESHOLD=0.15": {
+      "param_name": "DIVERSITY_THRESHOLD",
+      "param_value": 0.15,
+      "collapse_rate": 0.016598977170321837,
+      "trip_rate": 0.0,
+      "diversity_curve": [
+        0.8903138815498106,
+        0.8739317957712507,
+        0.8590025433458659,
+        0.8491541997496836,
+        0.8755355817555447
+      ]
+    },
+    "DIVERSITY_THRESHOLD=0.2": {
+      "param_name": "DIVERSITY_THRESHOLD",
+      "param_value": 0.2,
+      "collapse_rate": 0.027558160442663505,
+      "trip_rate": 0.0,
+      "diversity_curve": [
+        0.888577858584676,
+        0.8723508061105505,
+        0.8593482682873479,
+        0.8599671881527927,
+        0.8640902873920011
+      ]
+    },
+    "DIVERSITY_THRESHOLD=0.25": {
+      "param_name": "DIVERSITY_THRESHOLD",
+      "param_value": 0.25,
+      "collapse_rate": 0.0383911760460247,
+      "trip_rate": 0.0,
+      "diversity_curve": [
+        0.8963793384831591,
+        0.8780331256473857,
+        0.8546435916119485,
+        0.8565818039116313,
+        0.861966281495433
+      ]
+    }
+  },
+  "trap_tests": {
+    "liberal_bias": {
+      "stance_coverage": 1.0,
+      "bias_degree": -0.0560628415603876,
+      "sim_buckets": {
+        "强烈支持": 33,
+        "支持": 115,
+        "中立": 139,
+        "反对": 118,
+        "强烈反对": 95
+      },
+      "gt_mean": 0.5,
+      "sim_mean": 0.4439371584396124,
+      "pass": true,
+      "threshold_target": "立场覆盖率 > 80% 且 偏差度 < 0.1"
+    },
+    "mean_reversion": {
+      "extreme_capture_rate": 0.36571428571428577,
+      "reversion_degree": 0.0,
+      "sim_std": 0.24289979701827016,
+      "gt_std": 0.20385179801894207,
+      "sim_extreme_ratio": 0.256,
+      "gt_extreme_ratio": 0.7,
+      "pass": false,
+      "threshold_target": "极端捕捉率 > 60%"
+    },
+    "mode_collapse": {
+      "diversity_curve": [
+        0.8899163162114434,
+        0.8766412702414538,
+        0.8622872773267966,
+        0.8620171525775268,
+        0.868348335038522
+      ],
+      "collapse_rate": 0.024235965539704547,
+      "trip_rate": 0.0,
+      "threshold": 0.15,
+      "pass": true,
+      "threshold_target": "多样性下降 < 30%"
+    }
+  },
+  "duration_s": 0.15393710136413574
+}

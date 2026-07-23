@@ -1,0 +1,156 @@
+{
+  "concurrency": 10,
+  "model": "MiniMax-M3",
+  "provider_base_url": "https://api.minimaxi.com/anthropic",
+  "content_types": [
+    "美妆",
+    "美食",
+    "职场",
+    "萌宠",
+    "旅游"
+  ],
+  "persona_count": 1000,
+  "rounds": 1,
+  "started_at": "2026-07-23T01:11:45",
+  "finished_at": "2026-07-23T01:39:09",
+  "input_price_per_m_cny": 3.0,
+  "output_price_per_m_cny": 15.0,
+  "results_per_content": [
+    {
+      "total_requests": 1000,
+      "successful": 158,
+      "failed": 842,
+      "input_tokens": 12703,
+      "output_tokens": 3516,
+      "estimated_cost_cny": 0.0908,
+      "rate_limit_errors": 842,
+      "ttfb_ms": {
+        "p50": 1042.1,
+        "p95": 2749.9,
+        "mean": 1460.9
+      },
+      "total_ms": {
+        "p50": 1558.2,
+        "p95": 3290.3,
+        "mean": 1905.0
+      },
+      "content": "三招教你选对洗面奶",
+      "topic": "美妆",
+      "wallclock_seconds": 348.15,
+      "throughput_personas_per_s": 2.87,
+      "retries_total": 1711
+    },
+    {
+      "total_requests": 1000,
+      "successful": 163,
+      "failed": 837,
+      "input_tokens": 13193,
+      "output_tokens": 4103,
+      "estimated_cost_cny": 0.1011,
+      "rate_limit_errors": 837,
+      "ttfb_ms": {
+        "p50": 1016.2,
+        "p95": 2762.9,
+        "mean": 1353.8
+      },
+      "total_ms": {
+        "p50": 1571.5,
+        "p95": 3228.7,
+        "mean": 1872.2
+      },
+      "content": "在家做出米其林三星意面",
+      "topic": "美食",
+      "wallclock_seconds": 353.1,
+      "throughput_personas_per_s": 2.83,
+      "retries_total": 1695
+    },
+    {
+      "total_requests": 1000,
+      "successful": 388,
+      "failed": 612,
+      "input_tokens": 30851,
+      "output_tokens": 8745,
+      "estimated_cost_cny": 0.2237,
+      "rate_limit_errors": 612,
+      "ttfb_ms": {
+        "p50": 993.4,
+        "p95": 2764.8,
+        "mean": 1296.2
+      },
+      "total_ms": {
+        "p50": 1443.8,
+        "p95": 3218.5,
+        "mean": 1771.2
+      },
+      "content": "面试时这三个问题千万别回答",
+      "topic": "职场",
+      "wallclock_seconds": 313.09,
+      "throughput_personas_per_s": 3.19,
+      "retries_total": 1267
+    },
+    {
+      "total_requests": 1000,
+      "successful": 353,
+      "failed": 647,
+      "input_tokens": 28589,
+      "output_tokens": 8680,
+      "estimated_cost_cny": 0.216,
+      "rate_limit_errors": 647,
+      "ttfb_ms": {
+        "p50": 978.0,
+        "p95": 2796.2,
+        "mean": 1462.4
+      },
+      "total_ms": {
+        "p50": 1501.5,
+        "p95": 3371.9,
+        "mean": 1976.0
+      },
+      "content": "猫咪这五种行为说明它超爱你",
+      "topic": "萌宠",
+      "wallclock_seconds": 316.81,
+      "throughput_personas_per_s": 3.16,
+      "retries_total": 1314
+    },
+    {
+      "total_requests": 1000,
+      "successful": 336,
+      "failed": 664,
+      "input_tokens": 26844,
+      "output_tokens": 8028,
+      "estimated_cost_cny": 0.201,
+      "rate_limit_errors": 664,
+      "ttfb_ms": {
+        "p50": 945.5,
+        "p95": 2698.5,
+        "mean": 1254.9
+      },
+      "total_ms": {
+        "p50": 1432.8,
+        "p95": 3240.4,
+        "mean": 1736.2
+      },
+      "content": "云南 7 天自由行攻略",
+      "topic": "旅游",
+      "wallclock_seconds": 314.17,
+      "throughput_personas_per_s": 3.18,
+      "retries_total": 1351
+    }
+  ],
+  "summary": {
+    "total_requests": 5000,
+    "total_successful": 1398,
+    "total_failed": 3602,
+    "total_wallclock_seconds": 1645.33,
+    "avg_wallclock_per_content_seconds": 329.07,
+    "total_input_tokens": 112180,
+    "total_output_tokens": 33072,
+    "total_cost_cny": 0.8326,
+    "rate_limit_errors": 3602,
+    "p50_latency_ms": 1501.5,
+    "p95_latency_ms": 3240.4,
+    "theoretical_serial_seconds": 1558.2,
+    "actual_concurrent_seconds": 329.07,
+    "speedup_vs_concurrency_1": 4.74
+  }
+}
