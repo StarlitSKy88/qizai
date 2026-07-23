@@ -36,8 +36,8 @@ fi
 
 # Size threshold check
 SIZE=$(stat -f%z "$OUT" 2>/dev/null || stat -c%s "$OUT")
-if [ "$SIZE" -gt 10485760 ]; then  # 10MB hard fail
-  echo "[fetch-video] FAIL: $SIZE bytes > 10MB threshold" >&2
+if [ "$SIZE" -gt 26214400 ]; then  # 25MB hard fail (spec §Q5 v0.13.B.3 amended)
+  echo "[fetch-video] FAIL: $SIZE bytes > 25MB threshold" >&2
   rm -f "$OUT"
   exit 1
 elif [ "$SIZE" -gt 5242880 ]; then  # 5MB warn
