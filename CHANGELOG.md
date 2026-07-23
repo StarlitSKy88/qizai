@@ -167,6 +167,35 @@ qizai/
 - qwen3.5-flash + Fireworks + DeepSeek（LLM Router）
 - TypeScript 5.6 strict mode
 
+## [Unreleased] - v0.13.B.2（品牌 SVG）
+
+### Highlights
+
+qizai v0.13.B.2 — apps/web SocialFooter.tsx 3 个占位 Globe 替换为真实品牌 SVG（小红书 / 抖音 tiktok stand-in / B站）。
+
+- **simple-icons via jsdelivr CDN**：CC0 品牌资源，bash + curl predev/prebuild 自动 fetch
+- **fill="currentColor"**：build-time sed inject 到 root `<svg>` tag (simple-icons v13+ ships CSS-only)
+- **runtime fallback**: `<img onError>` → lucide `<Globe size={20}>`,console.warn 触发
+- **ADR-004 tiktok 替身**：simple-icons 无 douyin slug (verified 404 on 2026-07-23),用 tiktok 作视觉替身
+- **0 npm 依赖**：bash + curl + sed 全内置命令
+- **6 commits**：5 Task + 1 docs (CHANGELOG)
+- **37/37 tests pass**: 27 React baseline + 3 new React (SocialFooter) + 7 new shell (fetch-social-svgs) = 37
+
+### 🚀 Features
+
+- **constants**: `apps/web/src/constants/socials.ts` 单一事实源 + 4-test smoke (Task 1)
+- **scripts**: `scripts/fetch-social-svgs.sh` mtime idempotency + sed currentColor inject + 4 cleanups (Task 2)
+- **tests**: `scripts/fetch-social-svgs.test.sh` 7 shell tests with CONSTANTS_PATH override (Task 2)
+- **components**: `SocialIconButton.tsx` 30-line img+onError→Globe wrapper (Task 3)
+- **components**: `SocialFooter.tsx` REPLACE 23-line inline Globe → 13-line assembler (Task 4)
+- **tests**: `SocialFooter.test.tsx` 3 new tests: img paths / Globe fallback / aria-label preserved (Task 4)
+- **config**: `predev` + `prebuild` 双 hook (video + socials); `_headers` `/socials/*` immutable; gitignore (Task 5)
+
+### ⚙️ Miscellaneous
+
+- **docs**: spec `docs/superpowers/specs/2026-07-24-qizai-v013b2-brand-svg.md` 已 commit (6d55292)
+- **docs**: ADR-004 (tiktok stand-in decision + 3-path reversibility) inlined in spec §九
+
 ## [Unreleased] - v0.13.B.3（视频本地化）
 
 ### Highlights
