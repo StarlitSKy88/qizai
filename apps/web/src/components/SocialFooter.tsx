@@ -1,22 +1,15 @@
-import { Globe } from 'lucide-react';
+import { SOCIALS } from '../constants/socials';
+import { SocialIconButton } from './SocialIconButton';
 
-const SOCIALS = [
-  { label: '小红书', icon: Globe },
-  { label: '抖音', icon: Globe },
-  { label: 'B站', icon: Globe },
-] as const;
-
+/**
+ * Social footer — 13-line assembler (spec §五.4).
+ * Replaces v0.13.A's 23-line inline Globe implementation with mapper.
+ */
 export default function SocialFooter() {
   return (
     <div className="relative z-10 flex justify-center gap-4 pb-12">
-      {SOCIALS.map(({ label, icon: Icon }) => (
-        <button
-          key={label}
-          aria-label={label}
-          className="liquid-glass rounded-full p-4 text-white/80 hover:text-white hover:bg-white/5 transition-all"
-        >
-          <Icon size={20} />
-        </button>
+      {SOCIALS.map((platform) => (
+        <SocialIconButton key={platform.id} platform={platform} />
       ))}
     </div>
   );
