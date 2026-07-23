@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "vite",
+    "predev": "bash ../../scripts/fetch-video.sh",
     "build": "tsc --noEmit && vite build",
+    "prebuild": "bash ../../scripts/fetch-video.sh",
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
