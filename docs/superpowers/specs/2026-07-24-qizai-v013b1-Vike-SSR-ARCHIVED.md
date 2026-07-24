@@ -1,4 +1,12 @@
-# qizai v0.13.B.1 Multi-route SSR — Spec
+# qizai v0.13.B.1 Multi-route SSR — Spec **[ARCHIVED → v0.14]**
+
+> **⚠️ ARCHIVED 2026-07-24**: This spec was based on the **deprecated** `vite-plugin-ssr` package (now renamed **Vike**). Per 3-agent + 4-teammate audit (b65591b), the API surface in §五 is outdated and `renderPage`/`Link`/`passToClient` are not in the correct shape.
+>
+> **Decision (user 昴君, 2026-07-24)**: v0.13.B.1 ships as **react-router v6 pure SPA** (no SSR). SEO/SSR is deferred to **v0.14+**.
+>
+> **This document is preserved as design research** — when v0.14 SSR is revisited, use this as a starting point but verify every API call against current Vike docs (`https://vike.dev/`).
+>
+> Do NOT use this spec for implementation in v0.13.B.1. See `2026-07-24-qizai-v013b1-reactrouter-spa.md` for the current B.1 spec.
 
 > **For agentic workers:** Brainstormed design, not yet an implementation plan. After user review, invoke `superpowers:writing-plans` to produce the TDD plan.
 
