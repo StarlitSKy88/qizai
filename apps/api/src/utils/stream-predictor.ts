@@ -257,19 +257,25 @@ export async function runPredictionStream(
           return;
         }
       } catch (err) {
-        safeEmit(
-          sseEvent('error', {
-            code: 'DB_WRITE_FAILED',
-            message: '数据库写入失败',
-          }),
-        );
-        // T15a: same guard on the fallback error UPDATE.
-        await env.DB
+        // T15a: same guard on the fallback error UPDATE. Cancel is the
+        // authority — if the row is already aborted, do not emit the
+        // DB_WRITE_FAILED event (mirrors the success-path conditional
+        // suppression above; keeps all 4 UPDATE sites narratively
+        // consistent: UPDATE first, then decide whether to emit).
+        const fallbackResult = await env.DB
           .prepare(
             `UPDATE reports SET status=?, completed_at=? WHERE id=? AND status='streaming'`,
           )
           .bind('error', Math.floor(Date.now() / 1000), reportId)
           .run();
+        if ((fallbackResult.meta?.changes ?? 0) > 0) {
+          safeEmit(
+            sseEvent('error', {
+              code: 'DB_WRITE_FAILED',
+              message: '数据库写入失败',
+            }),
+          );
+        }
         return;
       }
     }
