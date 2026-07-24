@@ -45,7 +45,7 @@ describe('HeroContent', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders CTA as <a> link "关于我们" to /about (was 了解工作原理 button)', () => {
+  it('renders CTA as <a> link "关于我们" to /about (was legacy button)', () => {
     renderHeroContent();
     const link = screen.getByRole('link', { name: '关于我们' });
     expect(link).toBeInTheDocument();
