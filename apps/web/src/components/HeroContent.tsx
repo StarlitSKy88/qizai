@@ -8,7 +8,7 @@ export default function HeroContent() {
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('敬请期待 /predict', title);
+    navigate(`/predict?title=${encodeURIComponent(title)}`);
   };
 
   return (
