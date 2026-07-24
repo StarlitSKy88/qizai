@@ -10,8 +10,6 @@
   },
   "dependencies": {
     "@qizai/shared": "workspace:*",
-    "@types/bcryptjs": "^3.0.0",
-    "bcryptjs": "^3.0.3",
     "hono": "^4.6.0",
     "jose": "^5.10.0"
   },
