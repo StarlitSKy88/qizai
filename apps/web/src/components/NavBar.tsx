@@ -25,12 +25,12 @@ export default function NavBar() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <button
-            onClick={toast('敬请期待 /predict')}
+          <Link
+            to="/predict"
             className="text-white text-sm font-medium"
           >
             开始预测
-          </button>
+          </Link>
           <button
             onClick={toast('敬请期待 登录')}
             className="liquid-glass rounded-full px-6 py-2 text-white text-sm font-medium hover:bg-white/5 transition-colors"
