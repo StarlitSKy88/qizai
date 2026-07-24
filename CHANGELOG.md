@@ -167,6 +167,42 @@ qizai/
 - qwen3.5-flash + Fireworks + DeepSeek（LLM Router）
 - TypeScript 5.6 strict mode
 
+## [Unreleased] - v0.13.B.1（react-router v6 多路由 SPA）
+
+### Highlights
+
+qizai v0.13.B.1 — apps/web 从 v0.13.A 单屏首页升级为 4 路由 SPA（`/` / `/predict` / `/about` / `/pricing` + 404 fallback）。
+
+- **react-router v6 declarative** + `BrowserRouter` + nested `<Route element={<Layout />}>` (ADR-005)
+- **CF Pages `_redirects` SPA fallback**：`/* /index.html 200`，deep-link 刷新不再 404 (ADR-006)
+- **Pricing tiers ¥0 / ¥29 / ¥299** 替换 v0.13.A placeholder (ADR-007)
+- **39 commits**（T01-T30 + reconciliation）
+- **50 React tests pass**（30 baseline + 1 NotFound + 2 Home + 3 NavBar new + 4 About + 5 Predict + 5 Pricing）
+
+### 🚀 Features
+
+- **deps**：`react-router-dom ^6.26.0` 唯一新增依赖（No other npm dep additions）
+- **components**：`Layout` (Outlet wrapper) + `NavBar` 5 buttons → 5 Links（功能 `/` / 定价 `/pricing` / 关于 `/about` / 开始预测 `/predict` / logo `/`）
+- **components**：`HeroContent` `useNavigate` submit (`/predict?title=${encodeURIComponent(title)}`) + CTA 「了解工作原理」 → Link 「关于我们」 → `<Link to="/about">`
+- **pages**：`Home` (real VideoBackground+HeroContent composition) / `Predict` (form + 3 feature cards + `useSearchParams` 预填) / `About` (vision/team/contact 3 sections) / `Pricing` (3 tiers + `推荐方案` sr-only + Check icons) / `NotFound` (404 fallback)
+- **config**：`apps/web/public/_redirects` CF Pages SPA fallback（vite build 自动 copy 到 dist/）
+- **tests**：50 React tests total（30 baseline + 20 new: 1+2+3+4+5+5）
+
+### 🔄 Changed
+
+- **HeroContent.handleSubmit**：`console.log('Predict title:', ...)` → `navigate(\`/predict?title=\${encodeURIComponent(title)}\`)`（predict page pre-fills via useSearchParams）
+- **HeroContent CTA**：「了解工作原理」 → 「关于我们」 → `<Link to="/about">`（deleted from production code; 「了解工作原理」only ref in CHANGELOG v0.13.A Highlights as legacy note）
+- **NavBar** 5 buttons → 5 Links (T13/T14/T15 + T16 MEMORY ROUTER WRAP)
+- **Pricing tier 2 CTA**：「订阅」 → 「开始体验」
+- **App.tsx**：REWRITE 4 次（T08b/T21b/T25/T29）→ 最终 `BrowserRouter` + `Routes` + nested `<Route element={<Layout />}>` 5 routes（含 `*` NotFound）
+- **package.json**：`scripts.predev` / `scripts.prebuild` 双 hook 仍存在（B.3 视频本地化保留）
+
+### 📐 Architecture Decisions
+
+- [ADR-005](docs/superpowers/specs/2026-07-24-qizai-v013b1-reactrouter-spa.md)：react-router v6 declarative over Vike SSR / Next.js
+- [ADR-006](docs/superpowers/specs/2026-07-24-qizai-v013b1-reactrouter-spa.md)：CF Pages `_redirects` SPA fallback for deep-link refresh
+- [ADR-007](docs/superpowers/specs/2026-07-24-qizai-v013b1-reactrouter-spa.md)：Pricing tiers ¥0/¥29/¥299（replaces v0.13.A placeholder）
+
 ## [Unreleased] - v0.13.B.2（品牌 SVG）
 
 ### Highlights
