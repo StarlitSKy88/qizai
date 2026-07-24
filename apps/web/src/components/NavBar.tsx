@@ -13,9 +13,9 @@ export default function NavBar() {
             <span className="text-white font-semibold text-lg">qizai</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
+            <Link to="/predict" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
               功能
-            </a>
+            </Link>
             <a href="#pricing" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
               定价
             </a>

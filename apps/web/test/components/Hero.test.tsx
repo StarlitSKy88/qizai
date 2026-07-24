@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
 import Hero from '../../src/components/Hero';
+
+const renderWithRouter = (ui: React.ReactElement) =>
+  render(<BrowserRouter>{ui}</BrowserRouter>);
 
 describe('Hero', () => {
   it('renders all 4 child components', () => {
-    render(<Hero />);
+    renderWithRouter(<Hero />);
     // NavBar
     expect(screen.getByText('qizai')).toBeInTheDocument();
     // HeroContent
@@ -16,7 +20,7 @@ describe('Hero', () => {
   });
 
   it('top-level wrapper has min-h-screen bg-black overflow-hidden', () => {
-    const { container } = render(<Hero />);
+    const { container } = renderWithRouter(<Hero />);
     const wrap = container.firstChild as HTMLElement;
     expect(wrap.className).toContain('min-h-screen');
     expect(wrap.className).toContain('bg-black');
