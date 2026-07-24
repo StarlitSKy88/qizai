@@ -131,4 +131,31 @@ describe('Predict', () => {
     const input = screen.getByRole('textbox');
     expect(input).toHaveValue('hello');
   });
+
+  it('displays user-facing error message when SSE error event is received', async () => {
+    const user = userEvent.setup();
+    mockedApiFetch.mockResolvedValue({
+      ok: true,
+      body: { getReader: () => ({}) },
+    } as unknown as Response);
+    mockedConsumeSse.mockImplementation(async (_reader, onEvent) => {
+      onEvent({
+        type: 'error',
+        data: { code: 'LLM_DOWN', message: 'AI 临时不可用' },
+      });
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/predict']}>
+        <Predict />
+      </MemoryRouter>,
+    );
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'test title');
+    await user.click(screen.getByRole('button'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('AI 临时不可用');
+    // Form must be unblocked after the error so the user can retry.
+    expect(screen.getByRole('button')).not.toBeDisabled();
+  });
 });

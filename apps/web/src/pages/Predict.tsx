@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { apiFetch, consumeSse } from '../api/client';
 
 export default function Predict() {
@@ -9,6 +9,7 @@ export default function Predict() {
   const initialTitle = searchParams.get('title') ?? '';
   const [title, setTitle] = useState(initialTitle);
   const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -22,6 +23,7 @@ export default function Predict() {
       return;
     }
 
+    setErrorMessage(null);
     setSubmitting(true);
     try {
       const res = await apiFetch('/api/predict/stream', {
@@ -34,11 +36,20 @@ export default function Predict() {
       if (!res.ok || !res.body) {
         // API error path — auth.ts (T25) will add toast surface later.
         // For now, just unblock the form so the user can retry.
+        setErrorMessage('请求失败，请稍后重试');
         return;
       }
       const reader = res.body.getReader();
       await consumeSse(reader, (event) => {
-        if (event.type === 'complete' && event.data?.report_id) {
+        if (event.type === 'error') {
+          // Server-side LLM providers all failed; surface the message so
+          // the user sees a clear reason instead of a silent return.
+          // Cast to { message?: string } since SSE `data` is typed as any.
+          const msg =
+            (event.data && typeof event.data === 'object' && (event.data as { message?: string }).message) ||
+            'AI 临时不可用，请稍后重试';
+          setErrorMessage(msg);
+        } else if (event.type === 'complete' && event.data?.report_id) {
           navigate(`/report/${event.data.report_id}`);
         }
       });
@@ -58,6 +69,16 @@ export default function Predict() {
       <p className="text-white/80 text-lg text-center mb-12 leading-relaxed">
         粘贴标题、简介或正文，让 1000 个 persona 帮你投票决定要不要发布。 小红书 / 抖音 / B站 一键预测，给你可执行的发布建议。
       </p>
+
+      {errorMessage && (
+        <div
+          role="alert"
+          className="max-w-xl mx-auto mb-6 liquid-glass rounded-2xl p-4 flex items-start gap-3 border border-red-400/40"
+        >
+          <AlertCircle size={20} className="text-red-300 flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <p className="text-white/90 text-sm leading-relaxed">{errorMessage}</p>
+        </div>
+      )}
 
       <form className="max-w-xl mx-auto mb-16" onSubmit={handleSubmit}>
         <div className="liquid-glass rounded-full pl-6 pr-2 py-2 flex items-center gap-3">
