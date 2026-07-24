@@ -40,18 +40,21 @@ describe('Predict', () => {
   it('form submit calls console.log with title', async () => {
     const user = userEvent.setup();
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    render(
-      <MemoryRouter>
-        <Predict />
-      </MemoryRouter>,
-    );
-    const input = screen.getByRole('textbox');
-    await user.type(input, 'test title');
-    const button = screen.getByRole('button');
-    expect(button).toHaveAttribute('type', 'submit');
-    await user.click(button);
-    expect(consoleSpy).toHaveBeenCalledWith('2026-07-24 stub v0.14: title=test title');
-    consoleSpy.mockRestore();
+    try {
+      render(
+        <MemoryRouter>
+          <Predict />
+        </MemoryRouter>,
+      );
+      const input = screen.getByRole('textbox');
+      await user.type(input, 'test title');
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('type', 'submit');
+      await user.click(button);
+      expect(consoleSpy).toHaveBeenCalledWith('2026-07-24 stub v0.14: title=test title');
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 
   it('deep-link ?title=foo pre-fills input on initial mount', () => {
