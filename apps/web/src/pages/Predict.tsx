@@ -9,7 +9,7 @@ export default function Predict() {
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Predict title:', title);
+    console.log(`2026-07-24 stub v0.14: title=${title}`);
   };
 
   return (
