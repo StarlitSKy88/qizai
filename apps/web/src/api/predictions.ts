@@ -89,6 +89,12 @@ export interface ReportDetail {
 
 export async function getReport(id: string): Promise<ReportDetail> {
   const r = await apiFetch(`/api/report/${id}`);
-  if (!r.ok) throw new Error(`Get failed: HTTP ${r.status}`);
+  if (!r.ok) {
+    // Attach status so callers can branch on 404 / 401 without parsing
+    // the message. The numeric HTTP status is the only reliable signal.
+    const err = new Error(`Get failed: HTTP ${r.status}`) as Error & { status: number };
+    err.status = r.status;
+    throw err;
+  }
   return r.json() as Promise<ReportDetail>;
 }
