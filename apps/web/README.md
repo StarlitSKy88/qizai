@@ -13,6 +13,20 @@ pnpm test      # vitest unit/integration
 pnpm typecheck # tsc --noEmit
 pnpm e2e       # playwright（自动启动 vite，5 个 spec 在 apps/web/e2e/）
 pnpm e2e:ui    # playwright 自带 UI 调试器
+
+### E2E Tests (Playwright)
+
+First-time setup (downloads ~280MB chromium binary):
+
+```
+pnpm e2e:install
+```
+
+Run all e2e specs:
+
+```
+pnpm e2e
+```
 ```
 
 ## 视频源
