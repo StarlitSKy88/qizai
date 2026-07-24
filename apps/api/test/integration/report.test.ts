@@ -1,7 +1,8 @@
 // apps/api/test/integration/report.test.ts
 //
 // T20-T22 integration tests for the report routes.
-//   GET /api/report/:id  — fetch one report (owner-gated: 403 on other user)
+//   GET /api/report/:id  — fetch one report (owner-gated: NOT_FOUND for both
+//                          missing-id and other-user-id — see B2)
 //   GET /api/report/     — list current user's 50 most recent reports
 // Runs inside the Cloudflare Workers runtime via @cloudflare/vitest-pool-workers.
 // D1 migrations are applied once per suite via test/setup-integration.ts.
@@ -31,7 +32,9 @@ async function insertReport(id: string, userId: string, title: string, createdAt
 
 describe('report routes', () => {
   beforeEach(async () => {
-    await env.DB.exec('DELETE FROM reports; DELETE FROM users;');
+    // H5: also clear rate_limits so a later test in this file does not
+    // inherit a previous test's per-IP register/login budget.
+    await env.DB.exec('DELETE FROM reports; DELETE FROM users; DELETE FROM rate_limits;');
   });
 
   it('GET /:id returns own report', async () => {
@@ -46,15 +49,30 @@ describe('report routes', () => {
     expect(body.status).toBe('done');
   });
 
-  it('GET /:id 403 on other user report', async () => {
+  // B2: regression for the 403-vs-404 ownership leak. Returning 403 for
+  // "exists but belongs to someone else" lets an attacker enumerate every
+  // report id in the system — 404 means "no such row", 403 means "the
+  // row exists". We collapse both into 404 NOT_FOUND so the two cases
+  // are indistinguishable from the outside. The web UI already maps
+  // 403+404 to the same not-found UX in apps/web/src/pages/Report.tsx.
+  it('GET /:id returns 404 NOT_FOUND for another user\'s report (B2)', async () => {
     const { auth } = await setupUser('owner@b.com');
     const other = await setupUser('other@b.com');
     await insertReport('r2', other.userId, 'Other Report');
 
     const res = await app.request('/api/report/r2', { headers: { ...auth } }, env);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     const body = (await res.json()) as any;
-    expect(body.code).toBe('FORBIDDEN');
+    expect(body.code).toBe('NOT_FOUND');
+  });
+
+  it('GET /:id returns 404 NOT_FOUND for a nonexistent id (B2)', async () => {
+    const { auth } = await setupUser('lonely@b.com');
+
+    const res = await app.request('/api/report/does-not-exist', { headers: { ...auth } }, env);
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as any;
+    expect(body.code).toBe('NOT_FOUND');
   });
 
   it('GET / returns user history list', async () => {
