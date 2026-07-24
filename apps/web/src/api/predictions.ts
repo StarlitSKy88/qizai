@@ -73,7 +73,13 @@ export interface ReportSummary {
 
 export async function listReports(): Promise<ReportSummary[]> {
   const r = await apiFetch('/api/report');
-  if (!r.ok) throw new Error(`List failed: HTTP ${r.status}`);
+  if (!r.ok) {
+    // Surface the HTTP status on the thrown error so callers (e.g. the
+    // Predictions page) can branch on 401 without parsing the message.
+    const err = new Error(`List failed: HTTP ${r.status}`) as Error & { status: number };
+    err.status = r.status;
+    throw err;
+  }
   return (await (r.json() as Promise<{ reports: ReportSummary[] }>)).reports;
 }
 
