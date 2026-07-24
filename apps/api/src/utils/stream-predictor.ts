@@ -14,10 +14,10 @@
 //      + boosted_count + completed_at  (only when env.DB is bound)
 //   7. Emit SSE `complete` event with {report_id, report}
 //
-// Signature MUST stay stable across T12→T17:
-//   runPredictionStream(env, reportId, title, platforms, emit)
-// (T17 will add `userId` as a 6th positional arg — the orchestrator needs it
-// for quota reservation and rate-limit accounting.)
+// Signature (T17): userSub threaded through as the 2nd positional arg so the
+// orchestrator can increment quota_used on the users row after a successful
+// `complete`:
+//   runPredictionStream(env, userSub, reportId, title, platforms, emit)
 
 import { PersonaBuilder } from '@qizai/shared/persona/builder';
 import { SimulationEngine } from '@qizai/shared/simulation/engine';
@@ -36,6 +36,7 @@ interface PlatformRun {
 
 export async function runPredictionStream(
   env: AppEnv,
+  userSub: string,
   reportId: string,
   title: string,
   platforms: string[],
@@ -140,6 +141,16 @@ export async function runPredictionStream(
       report,
     }),
   );
+
+  // T17: charge the user's quota only on a real completion (a report was
+  // generated and the D1 row was updated). The empty-platform guard above
+  // returns early, so no quota is charged for an empty sweep.
+  if (env.DB) {
+    await env.DB
+      .prepare(`UPDATE users SET quota_used = quota_used + 1 WHERE id = ?`)
+      .bind(userSub)
+      .run();
+  }
 }
 
 function avg(arr: number[]): number {

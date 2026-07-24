@@ -82,7 +82,7 @@ predictRouter.post('/stream', requireAuth, async (c) => {
         ),
       );
 
-      await runPredictionStream(env, reportId, title, platforms, (event) => {
+      await runPredictionStream(env, user.sub, reportId, title, platforms, (event) => {
         controller.enqueue(new TextEncoder().encode(event));
       });
 
