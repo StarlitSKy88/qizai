@@ -176,6 +176,30 @@ predictRouter.post('/stream', requireAuth, async (c) => {
         }
       }
     },
+    // H2: client disconnected mid-stream. Refund the pre-charge so the
+    // user does not silently lose a quota slot to a navigation event,
+    // and mark the report aborted so /predictions does not show a hung
+    // \`streaming\` row.
+    async cancel() {
+      if (!env.DB) return;
+      try {
+        await env.DB
+          .prepare(
+            'UPDATE reports SET status=?, completed_at=? WHERE id=?',
+          )
+          .bind('aborted', Math.floor(Date.now() / 1000), reportId)
+          .run();
+        await env.DB
+          .prepare(
+            'UPDATE users SET quota_used = quota_used - 1 WHERE id = ? AND quota_used > 0',
+          )
+          .bind(user.sub)
+          .run();
+      } catch {
+        // Best-effort cleanup; if D1 is unhappy we do not want to mask
+        // the original cancellation error.
+      }
+    },
   });
 
   return new Response(stream, { headers: sseHeaders() });
