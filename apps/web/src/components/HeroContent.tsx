@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 export default function HeroContent() {
@@ -35,9 +35,9 @@ export default function HeroContent() {
         <p className="text-white text-sm leading-relaxed px-4">
           先问 1000 个 persona，再决定要不要发布——小红书 / 抖音 / B站 流量预测 co-pilot
         </p>
-        <button className="liquid-glass rounded-full px-8 py-3 text-white text-sm font-medium hover:bg-white/5 transition-colors">
-          了解工作原理
-        </button>
+        <Link to="/about" className="liquid-glass rounded-full px-8 py-3 text-white text-sm font-medium hover:bg-white/5 transition-colors inline-block">
+          关于我们
+        </Link>
       </div>
     </div>
   );
