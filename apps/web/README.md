@@ -1,6 +1,6 @@
-# qizai Web (v0.13.A)
+# qizai Web (v0.14)
 
-Vite + React 18 单屏首页 hero。
+Vite + React 18 + React Router 6 应用首页 hero + 多路由（注册/登录/预测/报告/历史）。
 
 ## 开发
 
@@ -9,8 +9,10 @@ cd apps/web
 pnpm dev       # http://localhost:5173
 pnpm build     # 产出 dist/
 pnpm preview   # 预览 dist/
-pnpm test      # vitest
+pnpm test      # vitest unit/integration
 pnpm typecheck # tsc --noEmit
+pnpm e2e       # playwright（自动启动 vite，5 个 spec 在 apps/web/e2e/）
+pnpm e2e:ui    # playwright 自带 UI 调试器
 ```
 
 ## 视频源
