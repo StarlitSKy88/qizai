@@ -34,11 +34,20 @@ describe('NavBar', () => {
     expect(screen.getByText('关于')).toBeInTheDocument();
   });
 
-  it('renders 登录 button with liquid-glass class', () => {
+  it('renders 登录 link to /login with liquid-glass class', () => {
     renderNavBar();
-    const loginBtn = screen.getByRole('button', { name: '登录' });
-    expect(loginBtn).toBeInTheDocument();
-    expect(loginBtn.className).toContain('liquid-glass');
+    const loginLink = screen.getByRole('link', { name: '登录' });
+    expect(loginLink).toBeInTheDocument();
+    expect(loginLink).toHaveAttribute('href', '/login');
+    expect(loginLink.className).toContain('liquid-glass');
+  });
+
+  it('renders 注册 link to /signup with liquid-glass class', () => {
+    renderNavBar();
+    const signupLink = screen.getByRole('link', { name: '注册' });
+    expect(signupLink).toBeInTheDocument();
+    expect(signupLink).toHaveAttribute('href', '/signup');
+    expect(signupLink.className).toContain('liquid-glass');
   });
 
   // 2 MODIFIED — was <button>, now <Link>

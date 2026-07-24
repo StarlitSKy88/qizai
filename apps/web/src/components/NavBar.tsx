@@ -2,8 +2,6 @@ import { Link } from 'react-router-dom';
 import { Globe } from 'lucide-react';
 
 export default function NavBar() {
-  const toast = (msg: string) => () => console.log(msg);
-
   return (
     <nav className="relative z-20 px-6 py-6">
       <div className="liquid-glass rounded-full px-6 py-3 flex items-center justify-between max-w-5xl mx-auto">
@@ -31,12 +29,18 @@ export default function NavBar() {
           >
             开始预测
           </Link>
-          <button
-            onClick={toast('敬请期待 登录')}
+          <Link
+            to="/login"
             className="liquid-glass rounded-full px-6 py-2 text-white text-sm font-medium hover:bg-white/5 transition-colors"
           >
             登录
-          </button>
+          </Link>
+          <Link
+            to="/signup"
+            className="liquid-glass rounded-full px-6 py-2 text-white text-sm font-medium hover:bg-white/5 transition-colors"
+          >
+            注册
+          </Link>
         </div>
       </div>
     </nav>
