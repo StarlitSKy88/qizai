@@ -111,6 +111,46 @@ describe('Signup', () => {
     });
   });
 
+  it('falls back to /predict for a protocol-relative redirect after signup', async () => {
+    mockedSignup.mockResolvedValue({ userId: 'u-2', token: 'jwt-2' });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={['/signup?redirect=//evil.com']}>
+        <Signup />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText('邮箱'), 'new@b.com');
+    await user.type(screen.getByLabelText('密码'), 'hunter22');
+    await user.type(screen.getByLabelText('确认密码'), 'hunter22');
+    await user.click(screen.getByRole('button', { name: '注册' }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/predict');
+    });
+  });
+
+  it('falls back to /predict for a backslash redirect after signup', async () => {
+    mockedSignup.mockResolvedValue({ userId: 'u-2', token: 'jwt-2' });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={['/signup?redirect=/\\evil.com']}>
+        <Signup />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText('邮箱'), 'new@b.com');
+    await user.type(screen.getByLabelText('密码'), 'hunter22');
+    await user.type(screen.getByLabelText('确认密码'), 'hunter22');
+    await user.click(screen.getByRole('button', { name: '注册' }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/predict');
+    });
+  });
+
   it('shows error when passwords do not match', async () => {
     const user = userEvent.setup();
 

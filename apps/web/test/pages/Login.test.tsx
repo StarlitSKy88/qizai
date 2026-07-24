@@ -4,6 +4,18 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Login from '../../src/pages/Login';
 
+const { mockNavigate } = vi.hoisted(() => ({
+  mockNavigate: vi.fn(),
+}));
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
 // Mock the auth API so the Login form exercises its real submit flow
 // without hitting the network. Tests assert on the mock's call args
 // and on the rendered DOM state (error message, navigation).
@@ -21,6 +33,7 @@ const mockedLogin = vi.mocked(login);
 describe('Login', () => {
   beforeEach(() => {
     mockedLogin.mockReset();
+    mockNavigate.mockReset();
     localStorage.removeItem('qizai_jwt');
   });
 
@@ -83,5 +96,81 @@ describe('Login', () => {
     );
     const link = screen.getByRole('link', { name: '注册' });
     expect(link).toHaveAttribute('href', '/signup');
+  });
+
+  it('navigates to the redirect path after login', async () => {
+    mockedLogin.mockResolvedValue({ userId: 'u-1', token: 'jwt-1' });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={['/login?redirect=/report/xyz']}>
+        <Login />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText('邮箱'), 'a@b.com');
+    await user.type(screen.getByLabelText('密码'), 'hunter2');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/report/xyz');
+    });
+  });
+
+  it('falls back to /predict for an external redirect after login', async () => {
+    mockedLogin.mockResolvedValue({ userId: 'u-1', token: 'jwt-1' });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={['/login?redirect=https://evil.com']}>
+        <Login />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText('邮箱'), 'a@b.com');
+    await user.type(screen.getByLabelText('密码'), 'hunter2');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/predict');
+    });
+  });
+
+  it('falls back to /predict for a protocol-relative redirect after login', async () => {
+    mockedLogin.mockResolvedValue({ userId: 'u-1', token: 'jwt-1' });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={['/login?redirect=//evil.com']}>
+        <Login />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText('邮箱'), 'a@b.com');
+    await user.type(screen.getByLabelText('密码'), 'hunter2');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/predict');
+    });
+  });
+
+  it('falls back to /predict for a backslash redirect after login', async () => {
+    mockedLogin.mockResolvedValue({ userId: 'u-1', token: 'jwt-1' });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={['/login?redirect=/\\evil.com']}>
+        <Login />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText('邮箱'), 'a@b.com');
+    await user.type(screen.getByLabelText('密码'), 'hunter2');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/predict');
+    });
   });
 });

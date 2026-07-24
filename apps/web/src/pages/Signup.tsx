@@ -2,11 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
 import { signup } from '../api/auth';
-
-function safeRedirect(raw: string | null): string {
-  if (!raw) return '/predict';
-  return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/predict';
-}
+import { safeRedirect } from '../utils/safeRedirect';
 
 export default function Signup() {
   const navigate = useNavigate();
