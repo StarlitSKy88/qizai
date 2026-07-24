@@ -69,6 +69,24 @@ describe('POST /api/predict/stream', () => {
     expect(body.code).toBe('CONTENT_TOO_LONG');
   });
 
+  it('returns 402 QUOTA_EXHAUSTED when quota_used >= quota_limit', async () => {
+    const { auth, userId } = await setupUser();
+    // Force the user to their monthly ceiling; auth header still valid for JWT.
+    await env.DB
+      .prepare('UPDATE users SET quota_used = 30, quota_limit = 30 WHERE id = ?')
+      .bind(userId)
+      .run();
+    const res = await app.request('/api/predict/stream', {
+      method: 'POST',
+      headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: { title: 'hello' }, platforms: ['xhs'] }),
+    }, env);
+    expect(res.status).toBe(402);
+    const body = (await res.json()) as any;
+    expect(body.code).toBe('QUOTA_EXHAUSTED');
+    expect(body.message).toContain('¥29');
+  });
+
   it('full SSE stream emits start + progress + complete', async () => {
     // Mock the LLM at the network boundary: LLM providers call the global
     // `fetch` (dashscope first in LLMRouter's fallback chain), while

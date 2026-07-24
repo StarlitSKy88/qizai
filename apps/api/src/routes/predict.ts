@@ -59,6 +59,20 @@ predictRouter.post('/stream', requireAuth, async (c) => {
     return c.json({ code: 'DB_NOT_CONFIGURED', message: 'D1 binding missing' }, 500);
   }
 
+  // T19: per-user monthly quota gate. Return 402 QUOTA_EXHAUSTED before any
+  // LLM work so the upgrade CTA can surface immediately. Skipped when DB is
+  // missing (handled by the DB_NOT_CONFIGURED branch above).
+  const quotaRow = await env.DB
+    .prepare('SELECT quota_used, quota_limit FROM users WHERE id = ?')
+    .bind(user.sub)
+    .first<{ quota_used: number; quota_limit: number }>();
+  if (quotaRow && quotaRow.quota_used >= quotaRow.quota_limit) {
+    return c.json(
+      { code: 'QUOTA_EXHAUSTED', message: '本月配额已用完，¥29 升级 300 次/月' },
+      402,
+    );
+  }
+
   await env.DB
     .prepare(
       `INSERT INTO reports (id, user_id, title, platforms, persona_count, content_hash)
