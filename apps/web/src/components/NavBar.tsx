@@ -16,12 +16,12 @@ export default function NavBar() {
             <Link to="/predict" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
               功能
             </Link>
-            <a href="#pricing" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
+            <Link to="/pricing" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
               定价
-            </a>
-            <a href="#about" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
+            </Link>
+            <Link to="/about" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
               关于
-            </a>
+            </Link>
           </div>
         </div>
         <div className="flex items-center gap-4">
