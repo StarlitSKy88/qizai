@@ -1,0 +1,18 @@
+# Test-only wrangler config. Mirrors wrangler.toml but isolates the JWT secret
+# so integration tests never accidentally sign tokens with the dev secret.
+name = "qizai-api"
+main = "src/index.ts"
+compatibility_date = "2026-07-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ALIBABA_BAILIAN_MODEL = "qwen3.5-flash"
+FIREWORKS_MODEL = "qwen3p7-plus"
+DEEPSEEK_MODEL = "deepseek-v4-flash"
+JWT_SECRET = "test-secret-isolated-from-dev"
+NODE_ENV = "test"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "qizai-db"
+database_id = "local-dev-placeholder"
