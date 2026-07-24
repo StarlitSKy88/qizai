@@ -26,13 +26,25 @@ export default function Predict() {
     setErrorMessage(null);
     setSubmitting(true);
     try {
-      const res = await apiFetch('/api/predict/stream', {
-        method: 'POST',
-        body: JSON.stringify({
-          content: { title },
-          platforms: ['xhs', 'tiktok', 'bilibili'],
-        }),
-      });
+      // B5: apiFetch wraps native `fetch`, which rejects (rather than
+      // returning a non-2xx Response) on network-level failures — DNS
+      // errors, offline mode, CSP blocks, TLS handshake drops, etc. The
+      // outer `try/finally` only resets `submitting`; without this
+      // inner catch the user sees a silent failure (button re-enables,
+      // no error UI). Map the throw to a user-facing message in zh-CN.
+      let res: Response;
+      try {
+        res = await apiFetch('/api/predict/stream', {
+          method: 'POST',
+          body: JSON.stringify({
+            content: { title },
+            platforms: ['xhs', 'tiktok', 'bilibili'],
+          }),
+        });
+      } catch (networkErr) {
+        setErrorMessage('网络异常，请检查连接后重试');
+        return;
+      }
       if (!res.ok) {
         // H3: parse the server's code and branch on it. The pre-charge
         // (C2) and cancel-handler (H2) mean these are now distinct UX

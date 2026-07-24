@@ -1,10 +1,17 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
 import { signup } from '../api/auth';
 
+function safeRedirect(raw: string | null): string {
+  if (!raw) return '/predict';
+  return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/predict';
+}
+
 export default function Signup() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = safeRedirect(searchParams.get('redirect'));
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,7 +32,7 @@ export default function Signup() {
     setSubmitting(true);
     try {
       await signup(email, password);
-      navigate('/predict');
+      navigate(redirect);
     } catch (err) {
       setError(err instanceof Error ? err.message : '注册失败');
     } finally {
@@ -108,7 +115,7 @@ export default function Signup() {
 
         <p className="text-white/70 text-sm text-center">
           已有账号？
-          <Link to="/login" className="underline hover:text-white ml-1">
+          <Link to={`/login?redirect=${encodeURIComponent(redirect)}`} className="underline hover:text-white ml-1">
             登录
           </Link>
         </p>

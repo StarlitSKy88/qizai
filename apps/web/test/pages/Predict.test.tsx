@@ -159,6 +159,31 @@ describe('Predict', () => {
     expect(screen.getByRole('button')).not.toBeDisabled();
   });
 
+  // B5: apiFetch can throw on network failures (offline, DNS, CSP) — the
+  // page must surface a user-facing zh-CN message instead of silently
+  // re-enabling the submit button. `fetch` itself rejects with a
+  // TypeError('Failed to fetch') in those cases; we use that exact shape
+  // because it's what browsers actually emit.
+  it('shows "网络异常，请检查连接后重试" when apiFetch throws (network failure)', async () => {
+    const user = userEvent.setup();
+    mockedApiFetch.mockRejectedValue(new Error('Failed to fetch'));
+
+    render(
+      <MemoryRouter initialEntries={['/predict']}>
+        <Predict />
+      </MemoryRouter>,
+    );
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'test title');
+    await user.click(screen.getByRole('button'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('网络异常，请检查连接后重试');
+    // Form must be unblocked so the user can retry once the network
+    // is back — the outer try/finally handles setSubmitting(false).
+    expect(screen.getByRole('button')).not.toBeDisabled();
+  });
+
   // H3: 402 QUOTA_EXHAUSTED must surface a code-specific upgrade CTA,
   // not the generic "请求失败" string. The error body is parsed; the
   // server's message is preserved and the upgrade hint is appended.

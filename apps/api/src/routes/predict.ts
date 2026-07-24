@@ -141,7 +141,12 @@ predictRouter.post('/stream', requireAuth, async (c) => {
       .bind(user.sub)
       .first<{ quota_used: number; quota_limit: number }>();
     if (!userRow) {
-      return c.json({ code: 'AUTH_REQUIRED', message: '请先登录' }, 401);
+      // B6: user row vanished between JWT verification and the quota
+      // pre-charge (deleted account, re-imported DB, race on registration
+      // rollback). From this server's perspective the token no longer maps
+      // to a real user, so 401 is the correct status — better than the
+      // 500 we'd get from dereferencing null below.
+      return c.json({ code: 'AUTH_FAILED', message: '用户不存在' }, 401);
     }
     return c.json(
       { code: 'QUOTA_EXHAUSTED', message: '本月配额已用完，¥29 升级 300 次/月' },

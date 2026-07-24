@@ -69,6 +69,47 @@ describe('POST /api/auth/register', () => {
     );
     expect(res.status).toBe(409);
   });
+
+  // B1: regression for the SELECT-then-INSERT race. Two concurrent
+  // registrations for the same email must produce exactly one 201 and
+  // one 409 EMAIL_TAKEN — never two 201s, and never a 500. The batch()
+  // wrapper plus the UNIQUE-constraint catch together cover both
+  // the "lost the SELECT race" path and the "lost the INSERT race"
+  // path.
+  it('rejects concurrent registrations of the same email (race-safe)', async () => {
+    const email = 'race@b.com';
+    const body = JSON.stringify({ email, password: 'correct horse' });
+    const reqInit: RequestInit = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    };
+
+    const [a, b] = await Promise.all([
+      app.request('/api/auth/register', reqInit, env),
+      app.request('/api/auth/register', reqInit, env),
+    ]);
+
+    const statuses = [a.status, b.status].sort();
+    expect(statuses).toEqual([201, 409]);
+
+    const winner = a.status === 201 ? a : b;
+    const loser = a.status === 201 ? b : a;
+    const winnerBody = (await winner.json()) as { userId: string; token: string };
+    expect(winnerBody.userId).toBeTruthy();
+    expect(winnerBody.token).toBeTruthy();
+
+    const loserBody = (await loser.json()) as { code: string };
+    expect(loserBody.code).toBe('EMAIL_TAKEN');
+
+    // Confirm exactly one user row landed.
+    const row = await env.DB.prepare(
+      'SELECT id FROM users WHERE email = ?',
+    )
+      .bind(email)
+      .first<{ id: string }>();
+    expect(row?.id).toBe(winnerBody.userId);
+  });
 });
 
 describe('POST /api/auth/login', () => {

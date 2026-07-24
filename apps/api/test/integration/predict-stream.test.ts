@@ -111,6 +111,26 @@ describe('POST /api/predict/stream', () => {
     expect(body.message).toContain('¥29');
   });
 
+  // B6: user row deleted between JWT verification and the quota SELECT
+  // (DB inconsistency, account deletion, re-imported DB). The route must
+  // not crash on a null row — it returns 401 AUTH_FAILED instead.
+  it('returns 401 AUTH_FAILED when JWT user no longer exists in DB', async () => {
+    const { auth, userId } = await setupUser();
+    // Delete the user row directly so the JWT is now orphaned.
+    await env.DB
+      .prepare('DELETE FROM users WHERE id = ?')
+      .bind(userId)
+      .run();
+    const res = await app.request('/api/predict/stream', {
+      method: 'POST',
+      headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: { title: 'hello' }, platforms: ['xhs'] }),
+    }, env);
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as any;
+    expect(body.code).toBe('AUTH_FAILED');
+  });
+
   it("cancel handler preserves status='done' after completion", async () => {
     const { userId } = await setupUser();
     const reportId = 'report-completed-before-cancel';
