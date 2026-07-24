@@ -18,9 +18,11 @@
 4. NavBar links converted from `<a href="#xxx">` fake anchors → react-router `<Link to="/xxx">` for real client-side navigation (no white flash).
 5. NavBar "开始预测" button → `<Link to="/predict">`.
 6. HeroContent form submit → react-router `<Link to="/predict?title=...">` (preserves deep-link intent; SSR pre-fill deferred to v0.14+).
-7. 404 fallback at `*` route.
-8. Test suite expansion: α (route navigation + component rendering, 16 new React tests, baseline 30 → 46).
-9. CHANGELOG v0.13.B.1 entry synced.
+7. HeroContent 「了解工作原理」 button → `<Link to="/about">`, **CTA 文案同步改为「关于我们」** (与 /about 内容"愿景/团队/联系"对齐).
+8. 404 fallback at `*` route.
+9. Test suite expansion: α (route navigation + component rendering, 19 new React tests, baseline 30 → 49). Includes 2 existing tests MODIFIED (NavBar.test.tsx + HeroContent.test.tsx 部分断言因 button→Link 而重写).
+10. CHANGELOG v0.13.B.1 entry synced (alphabetically between v0.13.A and v0.13.B.2).
+11. **ADR-007 (NEW):** Pricing tier 改为 ¥0/¥29/¥299（含免费档）,取代 v0.13.A §九 占位数字 ¥19/¥69/¥199.
 
 **Out:**
 
@@ -32,6 +34,7 @@
 - No animation library.
 - No real auth/登录 logic (still mock console.log, deferred to v0.13.B.4+).
 - No real LLM API call on /predict form submit (still placeholder, deferred to v0.13.B.4).
+- No quantitative marketing claims that v0.14 LLM cannot yet back (no "30 天流量曲线", no "30 秒拿到结果"; both deferred until v0.14 PRD alignment + measured benchmarks).
 - No SSR data-fetching (Apollo/SWR/React Query).
 - No analytics, no error reporting, no i18n.
 - No modification to `apps/api/` Hono Workers (v0.12 unchanged).
@@ -100,7 +103,7 @@ apps/web/
 │   └── ...                            ← other src/ files UNTOUCHED
 ├── test/
 │   ├── pages/                         ← NEW: route component tests
-│   │   ├── Home.test.tsx              ← NEW (2 tests: re-exports Hero, existing 30 React tests still pass)
+│   │   ├── Home.test.tsx              ← NEW (2 tests: composes VideoBackground + HeroContent; does NOT render NavBar/SocialFooter — those come from Layout)
 │   │   ├── Predict.test.tsx           ← NEW (5 tests)
 │   │   ├── About.test.tsx             ← NEW (4 tests)
 │   │   └── Pricing.test.tsx           ← NEW (5 tests)
@@ -213,7 +216,7 @@ export default function Predict() {
       </h1>
       <p className="text-white/80 text-lg leading-relaxed mb-12">
         粘贴标题、简介或正文，让 1000 个 persona 帮你投票决定要不要发布。
-        小红书 / 抖音 / B站 一键预测，覆盖 30 天流量曲线。
+        小红书 / 抖音 / B站 一键预测，给你可执行的发布建议。
       </p>
       <form
         onSubmit={handleSubmit}
@@ -228,7 +231,6 @@ export default function Predict() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="粘贴你的标题或内容..."
-          aria-label="内容标题或正文"
           className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white/40 text-base py-1"
         />
         <button
@@ -241,7 +243,7 @@ export default function Predict() {
       </form>
       <div className="grid md:grid-cols-3 gap-4">
         {[
-          { icon: Sparkles, title: '30 秒拿到结果', desc: '1000 个 persona 并行投票，不打扰你写稿' },
+          { icon: Sparkles, title: '几分钟拿到投票', desc: '1000 个 persona 并行投票，不打扰你写稿' },
           { icon: Sparkles, title: '3 平台同测', desc: '小红书 / 抖音 / B站 一键同跑，对比预测流量' },
           { icon: Sparkles, title: '可解释报告', desc: '每个预测附「为什么爆 / 为什么凉」决策依据' },
         ].map(({ icon: Icon, title, desc }) => (
@@ -273,7 +275,7 @@ export default function About() {
       </h1>
       <p className="text-white/80 text-lg leading-relaxed mb-12">
         qizai（骑仔）是给个人内容创作者的流量预测 co-pilot。
-        我们相信创作不该赌运气 —— 在按下「发布」之前，
+        我们相信创作不该赌运气——在按下「发布」之前，
         先问 1000 个真实 persona 帮你投票。
       </p>
       <div className="space-y-8">
@@ -294,7 +296,7 @@ export default function About() {
           </div>
           <p className="text-white/70 leading-relaxed pl-9">
             创始团队来自内容创作 + 算法工程交叉背景。
-            我们自己也是重度创作者 —— qizai 的每个功能都从「我自己用得着吗」出发。
+            我们自己也是重度创作者——qizai 的每个功能都从「我自己用得着吗」出发。
           </p>
         </section>
         <section>
@@ -335,8 +337,8 @@ const TIERS = [
     price: '¥29',
     period: '/ 月',
     desc: '认真做内容的独立创作者',
-    features: ['无限预测', '3 平台同测', '完整报告 + 决策依据', '历史报告存档 90 天'],
-    cta: '订阅',
+    features: ['无限预测', '3 平台同测', '完整报告 + 决策依据', '历史报告存档 90 天（即将上线）'],
+    cta: '开始体验',
     href: '/predict',
     highlight: true,
   },
@@ -345,7 +347,7 @@ const TIERS = [
     price: '¥299',
     period: '/ 月',
     desc: 'MCN / 内容工作室',
-    features: ['个人版全部功能', '5 个子账号', '历史报告永久存档', 'REST API 接入', '优先客服'],
+    features: ['个人版全部功能', '5 个子账号', '历史报告永久存档（即将上线）', 'REST API 接入（即将上线）', '优先客服'],
     cta: '联系销售',
     href: 'mailto:hi@qizai.app',
     highlight: false,
@@ -362,7 +364,7 @@ export default function Pricing() {
         定价
       </h1>
       <p className="text-white/80 text-lg leading-relaxed mb-12 text-center max-w-2xl mx-auto">
-        不收智商税 —— 按真实使用量定价，该有的功能都给，不藏着掖着。
+        不收智商税——按真实使用量定价，该有的功能都给，不藏着掖着。
       </p>
       <div className="grid md:grid-cols-3 gap-6">
         {TIERS.map((tier) => {
@@ -434,7 +436,7 @@ export default function NotFound() {
       >
         404
       </h1>
-      <p className="text-white/70 text-lg mb-8">这个页面不存在 —— 回到首页继续探索 qizai</p>
+      <p className="text-white/70 text-lg mb-8">这个页面不存在——回到首页继续探索 qizai</p>
       <Link
         to="/"
         className="inline-block liquid-glass rounded-full px-8 py-3 text-white text-sm hover:bg-white/5"
@@ -538,7 +540,6 @@ export default function HeroContent() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="输入你的内容标题"
-            aria-label="内容标题"
             className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white/40 text-base py-1"
           />
           <button
@@ -556,7 +557,7 @@ export default function HeroContent() {
           to="/about"
           className="liquid-glass rounded-full px-8 py-3 text-white text-sm font-medium hover:bg-white/5 transition-colors inline-block"
         >
-          了解工作原理
+          关于我们
         </Link>
       </div>
     </div>
@@ -564,7 +565,7 @@ export default function HeroContent() {
 }
 ```
 
-(Note: `了解工作原理` button changes from `<button>` to `<Link to="/about">` — semantically it's navigation, not action.)
+(Note: `关于我们` link is `<Link to="/about">` — CTA 文案与 `/about` 内容(愿景/团队/联系)对齐; button→Link 的 a11y 角色变化与 NavBar 「开始预测」→ Link 一致.)
 
 ### 5.10 apps/web/public/_redirects (NEW)
 
@@ -589,65 +590,77 @@ No script changes — `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck` al
 
 ## 六、Tests
 
-### 6.1 α: jsdom + vitest route/component tests (16 new tests, baseline 30 → 46)
+### 6.1 α: jsdom + vitest route/component tests (19 new + 4 modified; baseline 30 → 49)
 
-**`apps/web/test/pages/Home.test.tsx`** (NEW, 2 tests):
+> **MemoryRouter wrapping rule (B.1 new):** `useSearchParams`, `useNavigate`, `<Link>` only work inside a `<Router>` context. Tests that render NavBar / HeroContent / Pricing / Predict / Home MUST wrap the component in `<MemoryRouter initialEntries={['/route?qs=...']}>` (use real `<MemoryRouter>` from `react-router-dom`, not a hand-rolled stub). Tests for VideoBackground / SocialFooter / LiquidGlass do NOT need wrapping (no router hooks used).
+
+**`apps/web/test/pages/Home.test.tsx`** (NEW, 2 tests, MemoryRouter-wrapped):
 - renders VideoBackground + HeroContent (not NavBar/SocialFooter — those come from Layout)
-- existing 30 React tests still pass (Hero.test.tsx preserved, Home.test.tsx replaces `<Hero />` import path)
+- does NOT render `<nav>` (NavBar) or `<footer>` (SocialFooter) directly; only the wrapped Outlet contents
 
-**`apps/web/test/pages/Predict.test.tsx`** (NEW, 5 tests, wrapped in `<MemoryRouter>`):
+**`apps/web/test/pages/Predict.test.tsx`** (NEW, 5 tests, MemoryRouter-wrapped with `initialEntries={['/predict?title=foo']}`):
 - renders H1 "预测你的内容会爆吗？"
-- renders 3 feature cards
-- input updates title state
-- form submit calls console.log with title (no LLM)
-- deep-link `?title=foo` pre-fills input via `useSearchParams`
+- renders 3 feature cards with Sparkles icon
+- input updates title state (use `getByLabelText('内容标题或正文')`)
+- form submit calls `console.log` with title (no LLM — v0.14 deferred)
+- deep-link `?title=foo` pre-fills input on initial mount via `useSearchParams` (mount-time assertion only; URL change after mount does NOT re-update input by design)
 
-(Note: `useSearchParams` and `useNavigate` only work inside a `<Router>` context. All page tests wrap the component in `<MemoryRouter initialEntries={['/predict?title=foo']}>` to satisfy this.)
-
-**`apps/web/test/pages/About.test.tsx`** (NEW, 4 tests):
+**`apps/web/test/pages/About.test.tsx`** (NEW, 4 tests, MemoryRouter-wrapped):
 - renders H1 "关于 qizai"
-- renders 3 sections (vision / team / contact) with icons
-- mailto link to `hi@qizai.app`
-- social search hint text
+- renders 3 sections (愿景 / 团队 / 联系我们) with icons
+- mailto link `hi@qizai.app`
+- social search hint text "qizai 骑仔"
 
-**`apps/web/test/pages/Pricing.test.tsx`** (NEW, 5 tests):
+**`apps/web/test/pages/Pricing.test.tsx`** (NEW, 5 tests, MemoryRouter-wrapped — tier 1/2 `<Link>` requires Router context):
 - renders 3 tier cards
-- middle tier (个人创作者) has highlight ring + sr-only "推荐方案"
+- middle tier (个人创作者) has highlight ring + `<span className="sr-only">推荐方案</span>`
 - prices render ¥0 / ¥29 / ¥299
-- each tier lists features with Check icon
-- tier 1/2 are `<Link to="/predict">`, tier 3 is `<a href="mailto:...">`
+- each tier lists features with `<Check>` icon
+- tier 1/2 CTA → `<Link to="/predict">`, tier 3 CTA → `<a href="mailto:hi@qizai.app">`
+- tier 2 CTA 文案 = "开始体验" (not "订阅", since billing not live yet)
 
-**`apps/web/test/components/NavBar.test.tsx`** (MODIFY, 5 → 8 tests):
-- existing 5 preserved verbatim
-- new: 「功能」 / 「定价」 / 「关于」 are `<a>` (or react-router-rendered `<a>`) with `href="/predict"` etc.
-- new: 「开始预测」 is `<a>` with `href="/predict"`
-- new: clicking "功能" calls `useNavigate()` (mocked) — verifies real routing, not console.log
+**`apps/web/test/components/NavBar.test.tsx`** (MODIFY, 5 → 8 tests, MemoryRouter-wrapped):
+- **2 existing MODIFIED** (button→Link rewriting): test "renders 开始预测 button" → `getByRole('link', { name: '开始预测' })` + `toHaveAttribute('href', '/predict')`; test "calls console.log on 开始预测 click" → `expect(useNavigate mock).toHaveBeenCalledWith('/predict')`
+- **3 existing verbatim** preserved: qizai brand text, 登录 button liquid-glass, 3 link texts
+- **3 NEW**: 「功能」/「定价」/「关于」 each render as `<a>` with correct `href`; one of these (e.g. 「功能」) verifies clicking fires `useNavigate('/predict')` via mocked `vi.mock('react-router-dom', () => ({ ...vi.importActual(...), useNavigate: () => mockNav }))`
+
+**`apps/web/test/components/HeroContent.test.tsx`** (MODIFY, 6 unchanged + 2 MODIFIED → 6 tests preserved, 2 modified, total = 6 verbatim):
+- **2 MODIFIED** (button→Link rewriting): test "renders 了解工作原理 button" → `getByRole('link', { name: '关于我们' })` (CTA 文案 also changed from "了解工作原理" → "关于我们"); test "calls console.log on form submit" → `expect(useNavigate mock).toHaveBeenCalledWith('/predict?title=...')`
+- **4 verbatim preserved**: H1 renders, input updates, H1 styling, brand subtitle text
+- **+ MemoryRouter wrap** (HeroContent now uses `useNavigate` which needs Router context)
+
+> **Important — HeroContent uses `useNavigate` (per §5.9 MODIFY), so the entire test file MUST wrap in `<MemoryRouter>` or use `vi.mock('react-router-dom', ...)` to stub `useNavigate` returning a spy fn. Plan's Task 3 implements both options and picks the lighter one.**
 
 ### 6.2 Test count math
 
-| Category | Baseline (v0.13.B.2) | Added | Total |
-|---|---|---|---|
-| React (jsdom + vitest) | 30 | 16 | **46** |
-| Shell | 13 | 0 | **13** |
-| **Total** | 43 | 16 | **59** |
+| Category | Baseline (v0.13.B.2, pre-B.1) | Added | Modified | Total |
+|---|---|---|---|---|
+| React (jsdom + vitest) | 30 | 19 (2 Home + 5 Predict + 4 About + 5 Pricing + 3 NavBar new) | 4 (2 NavBar + 2 HeroContent) | **49** |
+| Shell | 13 | 0 | 0 | **13** |
+| **Total** | 43 | 19 | 4 | **62** |
 
-(Home.test.tsx's 2 tests are: re-export works + existing Hero tests pass. Plus 14 across Predict/About/Pricing + 3 NavBar new = 16.)
+> Math notes:
+> - "Modified" tests are NOT counted in the `+19` because `it()` count stays the same; `it()` count = `30 + 19 = 49`.
+> - The 4 modified tests have rewritten assertions (button→Link + console.log→useNavigate mock) but same `it()` slots — that's why "Total = 49" rather than "49 + 4 = 53".
+> - Shell tests are unchanged from v0.13.B.2 (no new fetch-* scripts; `_redirects` is static config).
+
+> **Why 49 React (not 46 as round-1 spec claimed):** round-1 spec counted "Added 16" because it only tallied Predict+About+Pricing+NavBar new. Round-2 audit found Home.test.tsx (2 tests) was missed in the Added column; corrected to 19. Total: 30 (baseline) + 19 (new `it()`) = 49.
 
 ## 七、Task decomposition (high-level preview, plan will detail TDD steps)
 
 | Task | Files | Test |
 |---|---|---|
 | Task 1 | `package.json` add `react-router-dom ^6.26.0`; `pnpm install`; verify existing 30 React tests + 13 shell tests still pass | 43 baseline tests pass + typecheck clean |
-| Task 2 | `src/App.tsx` REWRITE + `src/Layout.tsx` NEW + `src/pages/Home.tsx` NEW (re-export Hero) + `src/pages/NotFound.tsx` NEW | 2 Home tests pass; existing 30 React tests still pass |
-| Task 3 | `src/pages/Predict.tsx` NEW + `src/components/HeroContent.tsx` MODIFY (form submit → navigate) + `apps/web/public/_redirects` NEW | 5 Predict tests pass; 1 NavBar test (mocked navigate) pass |
-| Task 4 | `src/pages/About.tsx` NEW + `src/components/NavBar.tsx` MODIFY (`<a>` → `<Link>`) | 4 About tests pass; 2 NavBar tests pass |
-| Task 5 | `src/pages/Pricing.tsx` NEW | 5 Pricing tests pass |
-| Task 6 | Integration smoke + CHANGELOG | All 46 React + 13 shell = 59 tests pass; typecheck 0 errors; build produces dist with all 4 routes (react-router client-side); CHANGELOG v0.13.B.1 synced |
+| Task 2 | `src/App.tsx` REWRITE + `src/Layout.tsx` NEW + `src/pages/Home.tsx` NEW (composes VideoBackground + HeroContent) + `src/pages/NotFound.tsx` NEW | 2 Home tests pass; 30 baseline React tests preserved; typecheck clean |
+| Task 3 | `src/pages/Predict.tsx` NEW + `src/components/HeroContent.test.tsx` MODIFY (2 tests: 了解工作原理 button→Link + console.log→useNavigate mock) + `apps/web/public/_redirects` NEW | 5 Predict tests pass; 2 HeroContent tests MODIFIED; all 6 HeroContent tests still pass |
+| Task 4 | `src/pages/About.tsx` NEW + `src/components/NavBar.tsx` MODIFY (`<a>` → `<Link>`) + `src/components/NavBar.test.tsx` MODIFY (2 tests MODIFIED + 3 verbatim + 3 NEW) | 4 About tests pass; 8 NavBar tests pass; typecheck clean |
+| Task 5 | `src/pages/Pricing.tsx` NEW | 5 Pricing tests pass; typecheck clean |
+| Task 6 | Integration smoke + CHANGELOG | All 49 React + 13 shell = 62 tests pass; typecheck 0 errors; build produces dist with all 4 routes (react-router client-side); CHANGELOG v0.13.B.1 entry inserted between v0.13.A and v0.13.B.2 (alphabetical order) |
 
 ## 八、Global constraints
 
-- **Baseline test preservation:** 43 tests from v0.13.B.2 must continue to pass.
-- **Target test count:** 46 React + 13 shell = 59 total (v0.13.B.2 was 30+13=43, +16 from B.1).
+- **Baseline test preservation:** 43 tests from v0.13.B.2 (30 React + 13 shell) must continue to pass (4 of the 30 React tests have rewritten assertions but same `it()` slots — same total).
+- **Target test count:** 49 React + 13 shell = 62 total (v0.13.B.2 was 30+13=43, +19 new `it()` from B.1).
 - **typecheck clean** (TS 5.6 strict) — `all modified/new files pass \`tsc --noEmit\``.
 - **0 scope creep:** no Next.js, no SSR/Vike, no state mgmt, no UI lib, no animation lib, no SEO meta.
 - **react-router-dom ^6.x only** new dep.
@@ -681,6 +694,20 @@ No script changes — `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck` al
 - **Risk:** None for static CF Pages; if migrating to Vercel/Netlify, equivalent `_redirects`/`vercel.json`/`netlify.toml` rules apply.
 - **Reversibility:** Trivial — delete `_redirects` file.
 
+### ADR-007: Pricing tier 改为 ¥0/¥29/¥299 (NEW, replaces v0.13.A 占位 ¥19/¥69/¥199)
+
+- **Decision:** /pricing 展示 3 档: `¥0/永久` (试用) / `¥29/月` (个人创作者, highlight) / `¥299/月` (团队).
+- **Rationale:**
+  1. v0.13.A §九 列出的 ¥19/¥69/¥199 是 v0.12 早期占位, **从未进入 production**; v0.13.A Hero 单屏根本没有 /pricing 页, 这些数字属"未验证承诺".
+  2. 试用档 ¥0 符合个人创作者 MVP 定位 (CHANGELOG L141: "MVP for 个人内容创作者") — 免费档降低首次试用门槛, 与 v0.13.B.1 "3 平台同测 / 可解释报告" 价值主张匹配.
+  3. ¥29/月 个人档价格点在独立创作者心理预期内 (远低于 ¥99-¥199 企业 SaaS).
+  4. ¥299/月 团队档面向 MCN/工作室, 与 v0.13.A "团队" 列出的 5 子账号 / REST API 价值匹配.
+- **Spec-true guard:** tier 2 "历史报告存档 90 天" 与 tier 3 "永久存档 / REST API 接入" 在 B.1 文案中标注 "（即将上线）", 因为 D1 数据库 schema (CHANGELOG L147) 仍在 v0.14 backlog. 真实计费 (Stripe/微信支付) 在 v0.14 + ADR-008 (TBD) 落地前, tier 2 CTA 文案用 "开始体验" 而非 "订阅".
+- **Risk:**
+  - 定价与 v0.13.A 占位数字漂移 — CHANGELOG v0.13.B.1 entry 需明确标注 "replaces v0.13.A placeholder".
+  - "（即将上线）" 标注若 v0.14 延期会变成营销失信; 需在 v0.14 启动时同步 review.
+- **Reversibility:** Trivial — 改 §5.6 TIERS 数组 + 文案; 不影响架构/代码逻辑.
+
 ### Rollback (full-feature rollback)
 
 If v0.13.B.1 ships but user feedback demands single-screen SPA revert:
@@ -697,7 +724,7 @@ Reverts: `react-router-dom` dep, `src/App.tsx` (back to v0.13.B.2 single Hero im
 - **Q2 pages content:** static real copy (蕾姆-written, user reviews post-spec).
 - **Q3 copy author:** 蕾姆 writes, user approves post-spec.
 - **Q4 SSR scope:** **deferred to v0.14+**; v0.13.B.1 is pure SPA.
-- **Q5 test:** α only (16 React tests); β SSR / γ shell smoke **deferred to v0.14** when SSR ships.
+- **Q5 test:** α only (19 new React tests + 4 modified assertions; baseline 30 → 49 React); β SSR / γ shell smoke **deferred to v0.14** when SSR ships.
 - **Q6 deploy domain:** unchanged (CF Pages auto-assigns `*.qizai.pages.dev`).
 - **Q7 /api/* separation:** unchanged (separate `apps/api/` Workers deploy).
 - **Q8 NavBar link target:** `<Link to="/xxx">` from react-router.
@@ -706,8 +733,20 @@ Reverts: `react-router-dom` dep, `src/App.tsx` (back to v0.13.B.2 single Hero im
 
 ---
 
-**Spec self-review checklist (蕾姆 inline):**
+**Spec self-review checklist (蕾姆 inline, round-2 修订后):**
 1. Placeholders? None — all code blocks are complete.
-2. Internal consistency? ✅ §一 (in/out) matches §四 (file structure) and §七 (tasks). Test math §六.2 = 16 new = 30+16=46 React, 13 shell, 59 total ✓.
+2. Internal consistency? ✅ §一 (in/out) matches §四 (file structure) and §七 (tasks). Test math §六.2 = 19 new + 4 modified = 30+19=49 React, 13 shell, 62 total ✓. ADR-007 ¥0/¥29/¥299 与 §5.6 TIERS 一致 ✓. MemoryRouter wrap 规则 §六.1 提到一次, §七 Task 3/4 实施时复用.
 3. Scope check? ✅ Single coherent change (multi-route SPA); not multi-subsystem.
-4. Ambiguity check? ✅ ADR-005/006 have explicit reversibility paths. Vike spec archived at `*-Vike-SSR-ARCHIVED.md`.
+4. Ambiguity check? ✅ ADR-005/006/007 have explicit reversibility paths. Vike spec archived at `*-Vike-SSR-ARCHIVED.md`. CTA 「关于我们」 落地 `/about` 内容 (愿景/团队/联系) 一致 ✓.
+5. **Round-2 audit fixes applied (per 3-agent audit report):**
+   - C1 §六.2 math 30+19=49 ✓
+   - C2 §5.4 删 "30 天流量曲线" + "30 秒拿到结果", 改为 "几分钟拿到投票" ✓
+   - C3 §六.1 NavBar/HeroContent 改 "preserved verbatim" → 4 MODIFIED + 15 verbatim, MemoryRouter wrap 必填 ✓
+   - C4 §5.9 「了解工作原理」→「关于我们」 ✓
+   - C5 ADR-007 ¥0/¥29/¥299 + 取代占位 ✓
+   - I1 §5.6 tier 2 "订阅" → "开始体验" ✓
+   - I2 §四 L103 "re-exports Hero" → "composes VideoBackground + HeroContent" ✓
+   - I3 §六.1 Pricing.test.tsx 加 MemoryRouter wrap 说明 ✓
+   - I4 §5.4 + §5.9 删冗余 aria-label (input only uses `<label htmlFor>`) ✓
+   - I5 §七 Task 6 CHANGELOG 插入位置 (between v0.13.A and v0.13.B.2) ✓
+   - 全站破折号统一 `——` 紧排 (v0.13.A 风格) ✓
