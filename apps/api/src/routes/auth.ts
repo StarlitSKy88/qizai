@@ -2,13 +2,22 @@ import { Hono } from 'hono';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { signToken } from '../utils/jwt';
 import { getEnv } from '../utils/env';
+import { rateLimitByIp } from '../middleware/rate-limit';
 
 export const authRouter = new Hono();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LEN = 8;
 
-authRouter.post('/register', async (c) => {
+// H5: bcrypt is intentionally expensive (≈100ms per call on a CF Worker
+// CPU). Without a per-IP throttle a single attacker can saturate the
+// auth path with thousands of register / login attempts per minute.
+// 5/h for register blocks account-stuffing bots; 10/h for login blocks
+// credential stuffing without locking out legitimate retry-on-typo.
+const registerRateLimit = rateLimitByIp('register', 5, 3600);
+const loginRateLimit = rateLimitByIp('login', 10, 3600);
+
+authRouter.post('/register', registerRateLimit, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     email?: string;
     password?: string;
@@ -48,7 +57,7 @@ authRouter.post('/register', async (c) => {
   return c.json({ userId, token }, 201);
 });
 
-authRouter.post('/login', async (c) => {
+authRouter.post('/login', loginRateLimit, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     email?: string;
     password?: string;
