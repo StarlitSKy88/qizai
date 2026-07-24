@@ -57,7 +57,7 @@ describe('POST /api/predict/stream', () => {
     expect(body.code).toBe('INVALID_INPUT');
   });
 
-  it('rejects title longer than 2000 chars with 400 INVALID_INPUT', async () => {
+  it('rejects title longer than 2000 chars with 400 CONTENT_TOO_LONG', async () => {
     const { auth } = await setupUser();
     const res = await app.request('/api/predict/stream', {
       method: 'POST',
@@ -66,7 +66,7 @@ describe('POST /api/predict/stream', () => {
     }, env);
     expect(res.status).toBe(400);
     const body = (await res.json()) as any;
-    expect(body.code).toBe('INVALID_INPUT');
+    expect(body.code).toBe('CONTENT_TOO_LONG');
   });
 
   it('full SSE stream emits start + progress + complete', async () => {

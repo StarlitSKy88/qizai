@@ -41,8 +41,11 @@ predictRouter.post('/stream', requireAuth, async (c) => {
   }
 
   const title = (content as { title?: unknown }).title;
-  if (typeof title !== 'string' || title.length < 1 || title.length > 2000) {
+  if (typeof title !== 'string' || title.length < 1) {
     return c.json({ code: 'INVALID_INPUT', message: '标题必须是 1-2000 字的文本' }, 400);
+  }
+  if (title.length > 2000) {
+    return c.json({ code: 'CONTENT_TOO_LONG', message: '内容超过 2000 字' }, 400);
   }
 
   // platforms is optional; keep current default of ['xhs'] when absent/invalid.
