@@ -68,4 +68,41 @@ describe('POST /api/predict/stream', () => {
     const body = (await res.json()) as any;
     expect(body.code).toBe('INVALID_INPUT');
   });
+
+  it('full SSE stream emits start + progress + complete', async () => {
+    // Mock the LLM at the network boundary: LLM providers call the global
+    // `fetch` (dashscope first in LLMRouter's fallback chain), while
+    // `app.request` dispatches in-process and never touches `fetch`.
+    // A 200 from the Alibaba origin short-circuits all 100 persona calls
+    // instantly; any unexpected outbound call fails loudly.
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.includes('dashscope.aliyuncs.com')) {
+        return new Response(
+          JSON.stringify({ output: { text: 'mock persona reaction' } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      throw new Error(`Unexpected outbound fetch in test: ${url}`);
+    }) as typeof fetch;
+
+    try {
+      const { auth } = await setupUser();
+      const res = await app.request('/api/predict/stream', {
+        method: 'POST',
+        headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: { title: 'hello' }, platforms: ['xhs'] }),
+      }, env);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Type')).toContain('text/event-stream');
+      const text = await res.text();
+      expect(text).toContain('event: start');
+      expect(text).toContain('event: progress');
+      expect(text).toContain('event: complete');
+      expect(text).toContain('"platform":"xhs"');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
 });
