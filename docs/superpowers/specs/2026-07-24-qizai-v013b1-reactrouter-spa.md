@@ -741,11 +741,11 @@ Reverts: `react-router-dom` dep, `src/App.tsx` (back to v0.13.B.2 single Hero im
 5. **Round-2 audit fixes applied (per 3-agent audit report):**
    - C1 §六.2 math 30+19=49 ✓
    - C2 §5.4 删 "30 天流量曲线" + "30 秒拿到结果", 改为 "几分钟拿到投票" ✓
-   - C3 §六.1 NavBar/HeroContent 改 "preserved verbatim" → 4 MODIFIED + 15 verbatim, MemoryRouter wrap 必填 ✓
+   - C3 §六.1 NavBar/HeroContent 改 "preserved verbatim" → 4 MODIFIED + 7 verbatim (3 NavBar + 4 HeroContent), MemoryRouter wrap 必填 ✓
    - C4 §5.9 「了解工作原理」→「关于我们」 ✓
    - C5 ADR-007 ¥0/¥29/¥299 + 取代占位 ✓
    - I1 §5.6 tier 2 "订阅" → "开始体验" ✓
-   - I2 §四 L103 "re-exports Hero" → "composes VideoBackground + HeroContent" ✓
+   - I2 §四 file map row "re-exports Hero" → "composes VideoBackground + HeroContent" ✓
    - I3 §六.1 Pricing.test.tsx 加 MemoryRouter wrap 说明 ✓
    - I4 §5.4 + §5.9 删冗余 aria-label (input only uses `<label htmlFor>`) ✓
    - I5 §七 Task 6 CHANGELOG 插入位置 (between v0.13.A and v0.13.B.2) ✓
