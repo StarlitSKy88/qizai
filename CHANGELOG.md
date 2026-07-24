@@ -306,6 +306,7 @@ qizai v0.14.0 — end-to-end LLM-powered predict product. apps/api auth + D1 + S
 ### ⚙️ Miscellaneous
 
 - **stop hook fix (PR1)**: dev-secret prod guard + D1 FK enforcement (PRAGMA foreign_keys = ON)
+- **Opus final review fixes**: SSE heartbeat (25s margin) + LLM_DOWN error event + Predict.tsx error UI + Playwright install docs
 - **PR3 hygiene fix (T24)**: apps/web/test/setup.ts was missing expect.extend(matchers) + localStorage polyfill — both added, rescued 29 baseline tests
 - **T15 deviations**: PersonaBuilder.buildBalanced dropped unused `platform` option; report uses last platform's SimulationResult (multi-platform aggregation deferred)
 - **T16 deviations**: vitest-pool-workers 0.18 has no vi.mock, used globalThis.fetch stub to intercept dashscope
