@@ -3,6 +3,7 @@ import Layout from './Layout';
 import Home from './pages/Home';
 import About from './pages/About';
 import Predict from './pages/Predict';
+import Pricing from './pages/Pricing';
 import NotFound from './pages/NotFound';
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/predict" element={<Predict />} />
           <Route path="/about" element={<About />} />
+          <Route path="/pricing" element={<Pricing />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
