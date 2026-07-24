@@ -106,21 +106,38 @@ export async function runPredictionStream(
         // All 3 LLM providers failed for this platform. Surface a
         // user-facing SSE error and mark the report row as failed so the
         // user does not see a hanging `streaming` row forever.
-        safeEmit(
-          sseEvent('error', {
-            code: 'LLM_DOWN',
-            message: 'AI 临时不可用',
-          }),
-        );
         if (env.DB) {
-          await env.DB
+          // T15a: guard with `AND status='streaming'` so a concurrent
+          // `abortStreamingReport()` (client cancel) cannot have its
+          // `status='aborted'` clobbered back to `'error'`. The
+          // cancel handler is the authority on aborted rows.
+          const errorResult = await env.DB
             .prepare(
               `UPDATE reports
                SET status=?, completed_at=?
-               WHERE id=?`,
+               WHERE id=? AND status='streaming'`,
             )
             .bind('error', Math.floor(Date.now() / 1000), reportId)
             .run();
+          // If we lost the race (changes === 0), the row is already
+          // aborted — skip the error SSE so the client does not see a
+          // spurious error after they (or the route) emitted the cancel
+          // ack.
+          if ((errorResult.meta?.changes ?? 0) > 0) {
+            safeEmit(
+              sseEvent('error', {
+                code: 'LLM_DOWN',
+                message: 'AI 临时不可用',
+              }),
+            );
+          }
+        } else {
+          safeEmit(
+            sseEvent('error', {
+              code: 'LLM_DOWN',
+              message: 'AI 临时不可用',
+            }),
+          );
         }
         return;
       }
@@ -176,19 +193,30 @@ export async function runPredictionStream(
         finalRun.result,
       );
     } catch (err) {
-      safeEmit(
-        sseEvent('error', {
-          code: 'GENERATION_FAILED',
-          message: '报告生成失败',
-        }),
-      );
       if (env.DB) {
-        await env.DB
+        // T15a: guard with `AND status='streaming'` so we don't clobber
+        // an aborted row.
+        const errorResult = await env.DB
           .prepare(
-            `UPDATE reports SET status=?, completed_at=? WHERE id=?`,
+            `UPDATE reports SET status=?, completed_at=? WHERE id=? AND status='streaming'`,
           )
           .bind('error', Math.floor(Date.now() / 1000), reportId)
           .run();
+        if ((errorResult.meta?.changes ?? 0) > 0) {
+          safeEmit(
+            sseEvent('error', {
+              code: 'GENERATION_FAILED',
+              message: '报告生成失败',
+            }),
+          );
+        }
+      } else {
+        safeEmit(
+          sseEvent('error', {
+            code: 'GENERATION_FAILED',
+            message: '报告生成失败',
+          }),
+        );
       }
       return;
     }
@@ -200,7 +228,11 @@ export async function runPredictionStream(
     // page that then 404s or shows nothing.
     if (env.DB) {
       try {
-        await env.DB
+        // T15a: guard with `AND status='streaming'` so a concurrent
+        // abort cannot be clobbered back to `'done'`. If the row is
+        // already aborted (`meta.changes === 0`), skip the `complete`
+        // SSE event because the client has disconnected (or will).
+        const doneResult = await env.DB
           .prepare(
             `UPDATE reports
              SET status='done',
@@ -209,7 +241,7 @@ export async function runPredictionStream(
                  diversity=?,
                  boosted_count=?,
                  completed_at=?
-             WHERE id=?`,
+             WHERE id=? AND status='streaming'`,
           )
           .bind(
             JSON.stringify(report),
@@ -220,6 +252,10 @@ export async function runPredictionStream(
             reportId,
           )
           .run();
+        if ((doneResult.meta?.changes ?? 0) === 0) {
+          // Cancel beat us — abort handler is the authority.
+          return;
+        }
       } catch (err) {
         safeEmit(
           sseEvent('error', {
@@ -227,9 +263,10 @@ export async function runPredictionStream(
             message: '数据库写入失败',
           }),
         );
+        // T15a: same guard on the fallback error UPDATE.
         await env.DB
           .prepare(
-            `UPDATE reports SET status=?, completed_at=? WHERE id=?`,
+            `UPDATE reports SET status=?, completed_at=? WHERE id=? AND status='streaming'`,
           )
           .bind('error', Math.floor(Date.now() / 1000), reportId)
           .run();

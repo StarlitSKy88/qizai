@@ -149,6 +149,75 @@ describe('POST /api/predict/stream', () => {
     expect(user?.quota_used).toBe(1);
   });
 
+  // T15a: predictor UPDATEs must be guarded with `AND status='streaming'`
+  // so a concurrent cancel cannot have its `status='aborted'` clobbered
+  // back to `'done'` or `'error'` after the fact. These tests prove the
+  // SQL guard at the D1 boundary (decoupled from the orchestrator).
+  it("predictor's success UPDATE is a no-op on already-aborted rows", async () => {
+    const { userId } = await setupUser();
+    const reportId = 'report-aborted-then-success-attempted';
+    // Simulate post-cancel state: row already `aborted`.
+    await env.DB
+      .prepare(
+        `INSERT INTO reports (id, user_id, title, platforms, persona_count, content_hash, status)
+         VALUES (?, ?, ?, ?, ?, ?, 'aborted')`,
+      )
+      .bind(reportId, userId, 'aborted', '["xhs"]', 100, 'hash')
+      .run();
+
+    // Same UPDATE the predictor's success path now issues.
+    const result = await env.DB
+      .prepare(
+        `UPDATE reports
+         SET status='done',
+             report_json=?,
+             evidence_pack=?,
+             diversity=?,
+             boosted_count=?,
+             completed_at=?
+         WHERE id=? AND status='streaming'`,
+      )
+      .bind('{}', '{}', 0, 0, Math.floor(Date.now() / 1000), reportId)
+      .run();
+
+    expect(result.meta?.changes ?? 0).toBe(0);
+
+    // Row must still be `aborted` — no clobber.
+    const row = await env.DB
+      .prepare('SELECT status FROM reports WHERE id = ?')
+      .bind(reportId)
+      .first<{ status: string }>();
+    expect(row?.status).toBe('aborted');
+  });
+
+  it("predictor's error UPDATE is a no-op on already-aborted rows", async () => {
+    const { userId } = await setupUser();
+    const reportId = 'report-aborted-then-error-attempted';
+    await env.DB
+      .prepare(
+        `INSERT INTO reports (id, user_id, title, platforms, persona_count, content_hash, status)
+         VALUES (?, ?, ?, ?, ?, ?, 'aborted')`,
+      )
+      .bind(reportId, userId, 'aborted', '["xhs"]', 100, 'hash')
+      .run();
+
+    // Same UPDATE the predictor's error paths now issue.
+    const result = await env.DB
+      .prepare(
+        `UPDATE reports SET status=?, completed_at=? WHERE id=? AND status='streaming'`,
+      )
+      .bind('error', Math.floor(Date.now() / 1000), reportId)
+      .run();
+
+    expect(result.meta?.changes ?? 0).toBe(0);
+
+    const row = await env.DB
+      .prepare('SELECT status FROM reports WHERE id = ?')
+      .bind(reportId)
+      .first<{ status: string }>();
+    expect(row?.status).toBe('aborted');
+  });
+
   it('full SSE stream emits start + progress + complete', async () => {
     // Mock the LLM at the network boundary: LLM providers call the global
     // `fetch` (dashscope first in LLMRouter's fallback chain), while
