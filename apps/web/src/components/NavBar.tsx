@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Globe } from 'lucide-react';
 
 export default function NavBar() {
