@@ -1,6 +1,14 @@
-// STUB: replaced by T09 with real composition (VideoBackground + HeroContent).
-// This stub exists only to let App.tsx (T08b) compile while iterating on
-// routing skeleton without yet touching pages.
+// Home composition — VideoBackground + HeroContent only.
+// NavBar + SocialFooter are rendered by Layout (parent <Outlet /> wrapper),
+// so importing them via Hero would cause double-render.
+import VideoBackground from '../components/VideoBackground';
+import HeroContent from '../components/HeroContent';
+
 export default function Home() {
-  return <div>TODO: real Home</div>;
+  return (
+    <>
+      <VideoBackground />
+      <HeroContent />
+    </>
+  );
 }
