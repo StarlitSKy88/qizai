@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
 import app from '../../src/index';
+import { abortStreamingReport, createQuotaRefund } from '../../src/routes/predict';
 
 async function setupUser(email = 'a@b.com') {
   await env.DB.exec('DELETE FROM users');
@@ -108,6 +109,44 @@ describe('POST /api/predict/stream', () => {
     const body = (await res.json()) as any;
     expect(body.code).toBe('QUOTA_EXHAUSTED');
     expect(body.message).toContain('¥29');
+  });
+
+  it("cancel handler preserves status='done' after completion", async () => {
+    const { userId } = await setupUser();
+    const reportId = 'report-completed-before-cancel';
+    await env.DB
+      .prepare(
+        `INSERT INTO reports (id, user_id, title, platforms, persona_count, content_hash, status)
+         VALUES (?, ?, ?, ?, ?, ?, 'done')`,
+      )
+      .bind(reportId, userId, 'done report', '["xhs"]', 100, 'hash')
+      .run();
+
+    await abortStreamingReport(env.DB, reportId);
+
+    const report = await env.DB
+      .prepare('SELECT status FROM reports WHERE id = ?')
+      .bind(reportId)
+      .first<{ status: string }>();
+    expect(report?.status).toBe('done');
+  });
+
+  it('double-refund is idempotent', async () => {
+    const { userId } = await setupUser();
+    await env.DB
+      .prepare('UPDATE users SET quota_used = 2 WHERE id = ?')
+      .bind(userId)
+      .run();
+    const refund = createQuotaRefund(env.DB, userId);
+
+    await refund();
+    await refund();
+
+    const user = await env.DB
+      .prepare('SELECT quota_used FROM users WHERE id = ?')
+      .bind(userId)
+      .first<{ quota_used: number }>();
+    expect(user?.quota_used).toBe(1);
   });
 
   it('full SSE stream emits start + progress + complete', async () => {

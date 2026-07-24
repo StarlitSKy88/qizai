@@ -31,6 +31,35 @@ export const predictRouter = new Hono();
 const ALLOWED_PLATFORMS = ['xhs', 'tiktok', 'bilibili'] as const;
 const MAX_PLATFORMS = 3;
 
+export async function abortStreamingReport(
+  db: D1Database,
+  reportId: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE reports SET status=?, completed_at=? WHERE id=? AND status='streaming'`,
+    )
+    .bind('aborted', Math.floor(Date.now() / 1000), reportId)
+    .run();
+}
+
+export function createQuotaRefund(
+  db: D1Database | undefined,
+  userId: string,
+): () => Promise<void> {
+  let refunded = false;
+  return async () => {
+    if (refunded || !db) return;
+    refunded = true;
+    await db
+      .prepare(
+        'UPDATE users SET quota_used = quota_used - 1 WHERE id = ? AND quota_used > 0',
+      )
+      .bind(userId)
+      .run();
+  };
+}
+
 predictRouter.post('/stream', requireAuth, async (c) => {
   const env = getEnv(c);
 
@@ -135,6 +164,8 @@ predictRouter.post('/stream', requireAuth, async (c) => {
     )
     .run();
 
+  const refund = createQuotaRefund(env.DB, user.sub);
+
   const stream = new ReadableStream({
     async start(controller) {
       controller.enqueue(
@@ -159,14 +190,7 @@ predictRouter.post('/stream', requireAuth, async (c) => {
           }
         });
       } catch (err) {
-        if (env.DB) {
-          await env.DB
-            .prepare(
-              'UPDATE users SET quota_used = quota_used - 1 WHERE id = ? AND quota_used > 0',
-            )
-            .bind(user.sub)
-            .run();
-        }
+        await refund();
         throw err;
       } finally {
         try {
@@ -183,18 +207,8 @@ predictRouter.post('/stream', requireAuth, async (c) => {
     async cancel() {
       if (!env.DB) return;
       try {
-        await env.DB
-          .prepare(
-            'UPDATE reports SET status=?, completed_at=? WHERE id=?',
-          )
-          .bind('aborted', Math.floor(Date.now() / 1000), reportId)
-          .run();
-        await env.DB
-          .prepare(
-            'UPDATE users SET quota_used = quota_used - 1 WHERE id = ? AND quota_used > 0',
-          )
-          .bind(user.sub)
-          .run();
+        await abortStreamingReport(env.DB, reportId);
+        await refund();
       } catch {
         // Best-effort cleanup; if D1 is unhappy we do not want to mask
         // the original cancellation error.
