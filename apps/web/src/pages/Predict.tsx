@@ -1,15 +1,50 @@
 import { useState, FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Sparkles } from 'lucide-react';
+import { apiFetch, consumeSse } from '../api/client';
 
 export default function Predict() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialTitle = searchParams.get('title') ?? '';
   const [title, setTitle] = useState(initialTitle);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log(`2026-07-24 stub v0.14: title=${title}`);
+    if (!title.trim() || submitting) return;
+
+    // Defensive auth gate: a logged-out user can still hit /predict via
+    // the marketing nav. Bounce them to /login with a deep-link return
+    // before we burn a quota slot.
+    if (!localStorage.getItem('qizai_jwt')) {
+      navigate('/login?redirect=/predict');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await apiFetch('/api/predict/stream', {
+        method: 'POST',
+        body: JSON.stringify({
+          content: { title },
+          platforms: ['xhs', 'tiktok', 'bilibili'],
+        }),
+      });
+      if (!res.ok || !res.body) {
+        // API error path — auth.ts (T25) will add toast surface later.
+        // For now, just unblock the form so the user can retry.
+        return;
+      }
+      const reader = res.body.getReader();
+      await consumeSse(reader, (event) => {
+        if (event.type === 'complete' && event.data?.report_id) {
+          navigate(`/report/${event.data.report_id}`);
+        }
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -39,7 +74,8 @@ export default function Predict() {
           />
           <button
             type="submit"
-            className="bg-white rounded-full p-3 text-black hover:bg-white/90 transition-colors"
+            disabled={submitting}
+            className="bg-white rounded-full p-3 text-black hover:bg-white/90 transition-colors disabled:opacity-50"
           >
             <ArrowRight size={20} />
           </button>
