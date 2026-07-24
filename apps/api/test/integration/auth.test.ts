@@ -9,7 +9,7 @@ import { env } from 'cloudflare:test';
 import app from '../../src/index';
 
 async function clearUsers() {
-  await env.DB.exec('DELETE FROM users');
+  await env.DB.exec('DELETE FROM reports; DELETE FROM users;');
 }
 
 describe('POST /api/auth/register', () => {

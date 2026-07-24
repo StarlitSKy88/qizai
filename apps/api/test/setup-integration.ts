@@ -4,4 +4,5 @@
 import { applyD1Migrations } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 
+await env.DB.exec("PRAGMA foreign_keys = ON;");
 await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);

@@ -10,8 +10,8 @@ export const requireAuth = createMiddleware(async (c: Context, next) => {
     return c.json({ code: 'AUTH_REQUIRED', message: '请先登录' }, 401);
   }
   const token = auth.slice(7);
+  const env = getEnv(c); // outside try/catch — config error → 500
   try {
-    const env = getEnv(c);
     const payload = await verifyToken(token, env.JWT_SECRET);
     c.set('user', payload);
     await next();

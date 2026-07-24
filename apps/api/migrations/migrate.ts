@@ -1,9 +1,8 @@
 // apps/api/migrations/migrate.ts
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 
-const MIGRATIONS_DIR = path.join(import.meta.dir, '..', 'migrations');
+const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'migrations');
 
 export async function applyMigrations(local: D1Database): Promise<void> {
   const files = fs.readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort();

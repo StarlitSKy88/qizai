@@ -9,16 +9,12 @@ export interface JWTPayload {
 const ALG = 'HS256';
 const EXPIRES = '7d';
 
-export async function signToken(payload: JWTPayload, secret: string): Promise<string> {
+export async function signToken(payload: { sub: string; email: string }, secret: string): Promise<string> {
   const jwt = new SignJWT({ email: payload.email })
     .setProtectedHeader({ alg: ALG })
     .setSubject(payload.sub)
-    .setIssuedAt();
-  if (payload.exp !== undefined) {
-    jwt.setExpirationTime(new Date(payload.exp * 1000));
-  } else {
-    jwt.setExpirationTime(EXPIRES);
-  }
+    .setIssuedAt()
+    .setExpirationTime(EXPIRES);
   return jwt.sign(new TextEncoder().encode(secret));
 }
 
