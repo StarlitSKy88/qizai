@@ -24,6 +24,13 @@ import { runPredictionStream } from '../utils/stream-predictor';
 
 export const predictRouter = new Hono();
 
+// Whitelist of platforms the LLM orchestrator actually supports. Each entry
+// multiplies LLM cost by 100 personas, so without these guards a single
+// request could submit `platforms: Array(1000).fill('xhs')` and burn
+// 100,000 LLM calls for one quota charge. Keep the list short.
+const ALLOWED_PLATFORMS = ['xhs', 'tiktok', 'bilibili'] as const;
+const MAX_PLATFORMS = 3;
+
 predictRouter.post('/stream', requireAuth, async (c) => {
   const env = getEnv(c);
 
@@ -48,9 +55,33 @@ predictRouter.post('/stream', requireAuth, async (c) => {
     return c.json({ code: 'CONTENT_TOO_LONG', message: '内容超过 2000 字' }, 400);
   }
 
-  // platforms is optional; keep current default of ['xhs'] when absent/invalid.
+  // C1 hardening: filter raw `platforms` to the whitelist, dedupe, and cap
+  // the count. Default to the full whitelist when absent so the marketing
+  // copy ("3 平台同测") keeps working.
   const rawPlatforms = (body as { platforms?: unknown }).platforms;
-  const platforms = Array.isArray(rawPlatforms) ? (rawPlatforms as string[]) : ['xhs'];
+  const platforms: string[] = Array.isArray(rawPlatforms)
+    ? Array.from(
+        new Set(
+          rawPlatforms.filter(
+            (p): p is string =>
+              typeof p === 'string' &&
+              (ALLOWED_PLATFORMS as readonly string[]).includes(p),
+          ),
+        ),
+      )
+    : [...ALLOWED_PLATFORMS];
+  if (platforms.length === 0) {
+    return c.json(
+      { code: 'INVALID_INPUT', message: 'platforms 至少包含一个有效平台' },
+      400,
+    );
+  }
+  if (platforms.length > MAX_PLATFORMS) {
+    return c.json(
+      { code: 'INVALID_INPUT', message: `platforms 最多 ${MAX_PLATFORMS} 个` },
+      400,
+    );
+  }
 
   const user = getUser(c);
   const reportId = `report-${crypto.randomUUID()}`;
