@@ -22,10 +22,15 @@
 //     router fail for a given platform (engine.simulate throws), we emit
 //     `error` and a `status='error'` D1 UPDATE, then return so the route
 //     can close the stream cleanly instead of hanging.
+//   - H1: post-loop report generation + D1 write wrapped in try/catch so
+//     any unexpected throw there no longer leaves the report stuck in
+//     `streaming`. The route's own try/catch (C2) still refunds quota on
+//     rethrow.
+//   - H1: every `emit(...)` is wrapped by `safeEmit` so a closed sink
+//     (client cancelled mid-stream) never throws out of this function.
 //
 // Signature (T17): userSub threaded through as the 2nd positional arg so the
-// orchestrator can increment quota_used on the users row after a successful
-// `complete`:
+// orchestrator can refund quota via the route's try/catch on failure:
 //   runPredictionStream(env, userSub, reportId, title, platforms, emit)
 
 import { PersonaBuilder } from '@qizai/shared/persona/builder';
@@ -64,15 +69,22 @@ export async function runPredictionStream(
   const runs: PlatformRun[] = [];
   let totalBoosted = 0;
 
+  // H1: every emit goes through `safeEmit` so a closed sink (client
+  // cancelled mid-stream) does not turn into an unhandled rejection.
+  const safeEmit = (chunk: string): void => {
+    try {
+      emit(chunk);
+    } catch {
+      // Sink closed; swallow so we can keep going through the finally
+      // block where the heartbeat interval gets cleared.
+    }
+  };
+
   // SSE heartbeat: keep the connection alive across the 30s CF proxy
   // timeout. Comments (lines starting with `:`) are ignored by EventSource
   // consumers but reset the proxy's idle timer.
   const heartbeatInterval = setInterval(() => {
-    try {
-      emit(sseComment('heartbeat'));
-    } catch {
-      // Sink may be closed (controller already closed); nothing to do.
-    }
+    safeEmit(sseComment('heartbeat'));
   }, HEARTBEAT_INTERVAL_MS);
 
   try {
@@ -94,7 +106,7 @@ export async function runPredictionStream(
         // All 3 LLM providers failed for this platform. Surface a
         // user-facing SSE error and mark the report row as failed so the
         // user does not see a hanging `streaming` row forever.
-        emit(
+        safeEmit(
           sseEvent('error', {
             code: 'LLM_DOWN',
             message: 'AI 临时不可用',
@@ -116,7 +128,7 @@ export async function runPredictionStream(
       runs.push({ platform, result });
       totalBoosted += result.boostedCount;
 
-      emit(
+      safeEmit(
         sseEvent('progress', {
           report_id: reportId,
           platform,
@@ -127,7 +139,7 @@ export async function runPredictionStream(
       );
 
       if (result.boostedCount > 0) {
-        emit(
+        safeEmit(
           sseEvent('boost_triggered', {
             report_id: reportId,
             platform,
@@ -142,7 +154,7 @@ export async function runPredictionStream(
     // final result. The route already inserted the `streaming` row; the safest
     // transition is to leave it untouched rather than overwrite with garbage.
     if (runs.length === 0) {
-      emit(
+      safeEmit(
         sseEvent('complete', {
           report_id: reportId,
           report: null,
@@ -151,41 +163,81 @@ export async function runPredictionStream(
       return;
     }
 
-    // ReportGenerator.generate(content, result) takes a single SimulationResult.
-    // We feed it the final platform's result; multi-platform aggregation (e.g.
-    // cross-platform evidence) is a future task. Diversity for the D1 row is
-    // averaged across all platforms so the summary reflects the whole sweep.
-    const finalRun = runs[runs.length - 1];
-    const report = generator.generate(
-      { title, cover: '', tags: [] },
-      finalRun.result,
-    );
+    // H1: report generation can throw if the persona data shape drifts
+    // from the generator's expectation. Without this guard a thrown
+    // generator would leave the report stuck in `streaming` forever
+    // because the D1 UPDATE never runs. Surface a `GENERATION_FAILED`
+    // error event and mark the row failed instead.
+    let report: ReturnType<ReportGenerator['generate']>;
+    try {
+      const finalRun = runs[runs.length - 1];
+      report = generator.generate(
+        { title, cover: '', tags: [] },
+        finalRun.result,
+      );
+    } catch (err) {
+      safeEmit(
+        sseEvent('error', {
+          code: 'GENERATION_FAILED',
+          message: '报告生成失败',
+        }),
+      );
+      if (env.DB) {
+        await env.DB
+          .prepare(
+            `UPDATE reports SET status=?, completed_at=? WHERE id=?`,
+          )
+          .bind('error', Math.floor(Date.now() / 1000), reportId)
+          .run();
+      }
+      return;
+    }
     const diversity = avg(runs.map((r) => r.result.diversity));
 
+    // H1: the D1 UPDATE itself can fail (transient D1 error, schema drift,
+    // disk full). Wrap it so we do not emit a `complete` event whose data
+    // was never persisted — that would let the user click into a report
+    // page that then 404s or shows nothing.
     if (env.DB) {
-      await env.DB
-        .prepare(
-          `UPDATE reports
-           SET status='done',
-               report_json=?,
-               evidence_pack=?,
-               diversity=?,
-               boosted_count=?,
-               completed_at=?
-           WHERE id=?`,
-        )
-        .bind(
-          JSON.stringify(report),
-          JSON.stringify(report.evidence ?? {}),
-          diversity,
-          totalBoosted,
-          Math.floor(Date.now() / 1000),
-          reportId,
-        )
-        .run();
+      try {
+        await env.DB
+          .prepare(
+            `UPDATE reports
+             SET status='done',
+                 report_json=?,
+                 evidence_pack=?,
+                 diversity=?,
+                 boosted_count=?,
+                 completed_at=?
+             WHERE id=?`,
+          )
+          .bind(
+            JSON.stringify(report),
+            JSON.stringify(report.evidence ?? {}),
+            diversity,
+            totalBoosted,
+            Math.floor(Date.now() / 1000),
+            reportId,
+          )
+          .run();
+      } catch (err) {
+        safeEmit(
+          sseEvent('error', {
+            code: 'DB_WRITE_FAILED',
+            message: '数据库写入失败',
+          }),
+        );
+        await env.DB
+          .prepare(
+            `UPDATE reports SET status=?, completed_at=? WHERE id=?`,
+          )
+          .bind('error', Math.floor(Date.now() / 1000), reportId)
+          .run();
+        return;
+      }
     }
 
-    emit(
+    safeEmit(
       sseEvent('complete', {
         report_id: reportId,
         report,
