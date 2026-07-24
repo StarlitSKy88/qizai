@@ -266,3 +266,63 @@ qizai v0.13.B.3 — apps/web 视频资源从 CloudFront CDN 切到本地 `public
 - **spec retro-edit**: v0.14 cleanup — spec §三/§5.1/§5.3/§5.5/§六/§九/§十 + §十二 ADR 块，与代码 100% 对齐
 
 [Unreleased]: https://github.com/qq38785/qizai/compare/v0.12.0...HEAD
+
+---
+
+## [0.14.0] - 2026-07-25
+
+### Highlights
+
+qizai v0.14.0 — end-to-end LLM-powered predict product. apps/api auth + D1 + SSE backend; apps/web SSE consumer + 4 new pages.
+
+- **5 PR + 1 release** (PR1-PR5 + T43 release)
+- **43 atomic tasks** all complete (Subagent-Driven mode)
+- **111/111 tests pass**: 82 web + 29 api
+- **0 typecheck errors** (both workspaces)
+- **0 banned-copy hits**
+
+### 🚀 Features
+
+- **auth** (PR1, T01-T10): D1 schema (users/reports/rate_limits) + bcryptjs + jose JWT HS256 7d + requireAuth middleware + POST /api/auth/register + /login + integration tests
+- **sse backend** (PR2, T11-T22): sse.ts helpers (sseHeaders/sseEvent/sseComment) + POST /api/predict/stream SSE route + 3-platform serial orchestrator (PersonaBuilder + SimulationEngine + ReportGenerator) + quota increment on complete + CONTENT_TOO_LONG + QUOTA_EXHAUSTED + GET /api/report/:id + GET /api/report list
+- **frontend** (PR3, T23-T36): apiFetch + consumeSse wrappers (T24) + Predict.tsx SSE consumer (T23) + api/auth.ts + api/predictions.ts + Login.tsx + Signup.tsx + Report.tsx + Predictions.tsx + App.tsx 4 new routes + NavBar 登录 button → Link
+- **e2e** (PR4, T37-T41): Playwright setup + 5 spec files (register-login / predict-stream / auth-gate / quota-exhausted / report-share) using `page.route()` to mock SSE
+- **release** (PR5, T43): this CHANGELOG entry
+
+### 🔄 Changed
+
+- **vitest isolation**: apps/api upgraded to vitest@4 + vitest-pool-workers@0.18 (ESM-only) for D1/Hono integration tests; apps/web + packages/shared stay on vitest@2 (pnpm per-workspace resolution)
+- **Predict.tsx**: console.log stub → fetch POST /api/predict/stream + consumeSse + navigate to /report/:id
+- **NavBar**: 登录 `<button onClick>` → `<Link to="/login">` + 注册 + 历史报告 links
+- **App.tsx**: 5 routes → 9 routes (+/login /signup /report/:id /predictions)
+
+### 📐 Architecture Decisions
+
+- [ADR-008](docs/superpowers/specs/2026-07-24-qizai-v014-llm-predict-design.md): SSE over WebSocket (CF Workers native + retry semantics)
+- [ADR-009](docs/superpowers/specs/2026-07-24-qizai-v014-llm-predict-design.md): D1 over Postgres (single-region MVP)
+- [ADR-010](docs/superpowers/specs/2026-07-24-qizai-v014-llm-predict-design.md): 3 platforms serial over parallel
+- [ADR-011](docs/superpowers/specs/2026-07-24-qizai-v014-llm-predict-design.md): Full JWT + bcrypt (vs mock session)
+
+### ⚙️ Miscellaneous
+
+- **stop hook fix (PR1)**: dev-secret prod guard + D1 FK enforcement (PRAGMA foreign_keys = ON)
+- **PR3 hygiene fix (T24)**: apps/web/test/setup.ts was missing expect.extend(matchers) + localStorage polyfill — both added, rescued 29 baseline tests
+- **T15 deviations**: PersonaBuilder.buildBalanced dropped unused `platform` option; report uses last platform's SimulationResult (multi-platform aggregation deferred)
+- **T16 deviations**: vitest-pool-workers 0.18 has no vi.mock, used globalThis.fetch stub to intercept dashscope
+- **Quota UI display**: deferred from PR4 (out of scope per plan §T37-T41 simplification note)
+
+### Dependencies
+
+**New (apps/api)**:
+- bcryptjs ^3.0.3
+- jose ^5.x
+- vitest-pool-workers ^0.18.8 (dev)
+- vitest ^4.1.10 (dev)
+
+**New (apps/web)**:
+- @playwright/test ^1.61.1 (dev)
+
+**Kept (apps/shared)**:
+- vitest ^2.x unchanged
+
+[0.14.0]: https://github.com/qq38785/qizai/compare/v0.13.B.3...v0.14.0
