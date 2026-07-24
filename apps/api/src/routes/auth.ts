@@ -38,6 +38,12 @@ authRouter.post('/register', registerRateLimit, async (c) => {
   const env = getEnv(c);
   if (!env.DB) return c.json({ code: 'DB_NOT_CONFIGURED' }, 500);
 
+  const userId = `user-${crypto.randomUUID()}`;
+
+  // B1 fast-path: cheap SELECT first so a known-duplicate registration
+  // doesn't pay the bcrypt cost (≈100ms on a CF Worker CPU). This is
+  // intentionally *not* the race guard — two concurrent requests will
+  // both pass this check. The atomic batch below is.
   const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?')
     .bind(email)
     .first<{ id: string }>();
@@ -45,13 +51,32 @@ authRouter.post('/register', registerRateLimit, async (c) => {
     return c.json({ code: 'EMAIL_TAKEN', message: '该邮箱已注册' }, 409);
   }
 
-  const userId = `user-${crypto.randomUUID()}`;
   const hash = await hashPassword(password);
-  await env.DB.prepare(
+
+  // B1 atomic guard: race window between the pre-check SELECT above and
+  // the INSERT below. A concurrent writer can land the same email in
+  // that gap, which would otherwise produce two user rows and a leaked
+  // 500. env.DB.batch([...]) runs the whole sequence as one transaction;
+  // if either statement fails the batch rolls back. We rely on the
+  // users.email UNIQUE constraint to trip and translate the rollback
+  // into a clean 409 EMAIL_TAKEN — the same response the fast-path
+  // would have produced if it had seen the row first.
+  const selectStmt = env.DB.prepare('SELECT id FROM users WHERE email = ?')
+    .bind(email);
+  const insertStmt = env.DB.prepare(
     'INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)',
-  )
-    .bind(userId, email, hash)
-    .run();
+  ).bind(userId, email, hash);
+
+  try {
+    await env.DB.batch([selectStmt, insertStmt]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/UNIQUE constraint failed|users\.email/i.test(msg)) {
+      console.debug('[auth/register] lost race to concurrent insert', { email });
+      return c.json({ code: 'EMAIL_TAKEN', message: '该邮箱已注册' }, 409);
+    }
+    throw err;
+  }
 
   const token = await signToken({ sub: userId, email }, env.JWT_SECRET);
   return c.json({ userId, token }, 201);
