@@ -9,7 +9,10 @@ import { env } from 'cloudflare:test';
 import app from '../../src/index';
 
 async function clearUsers() {
-  await env.DB.exec('DELETE FROM reports; DELETE FROM users;');
+  // H5: also clear rate_limits so the per-IP throttle bucket is fresh
+  // for each test — otherwise a later test in the same file would
+  // inherit the previous test's register/login budget.
+  await env.DB.exec('DELETE FROM reports; DELETE FROM users; DELETE FROM rate_limits;');
 }
 
 describe('POST /api/auth/register', () => {
@@ -115,5 +118,39 @@ describe('POST /api/auth/login', () => {
       env,
     );
     expect(res.status).toBe(401);
+  });
+
+  // H5: register is throttled at 5/h per IP. The first 5 calls return
+  // 201 / 409; the 6th call (same IP, same hour window) must return 429
+  // with a RATE_LIMITED code so a credential-stuffing bot can't burn
+  // bcrypt CPU without bound.
+  it('returns 429 RATE_LIMITED after 5 register attempts within 1 hour', async () => {
+    for (let i = 0; i < 5; i++) {
+      const res = await app.request(
+        '/api/auth/register',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: `rate-${i}@b.com`,
+            password: 'correct horse',
+          }),
+        },
+        env,
+      );
+      expect(res.status).toBe(201);
+    }
+    const blocked = await app.request(
+      '/api/auth/register',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'rate-6@b.com', password: 'correct horse' }),
+      },
+      env,
+    );
+    expect(blocked.status).toBe(429);
+    const body = (await blocked.json()) as { code: string };
+    expect(body.code).toBe('RATE_LIMITED');
   });
 });

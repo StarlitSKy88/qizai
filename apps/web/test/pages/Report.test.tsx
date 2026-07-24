@@ -81,6 +81,19 @@ describe('Report', () => {
     });
   });
 
+  // H4: 403 (report belongs to a different user) must reuse the
+  // "报告不存在" UX for parity — the user should not learn whether the
+  // reportId exists for someone else. This was previously falling into
+  // the "其他错误" branch and silently leaving the page on "加载中…".
+  it('shows "报告不存在" on 403', async () => {
+    const err = new Error('HTTP 403') as Error & { status: number };
+    err.status = 403;
+    mockedGetReport.mockRejectedValue(err);
+    renderAt('r-foreign');
+    const heading = await screen.findByRole('heading', { level: 1, name: '报告不存在' });
+    expect(heading).toBeInTheDocument();
+  });
+
   it('calls getReport with id from useParams', async () => {
     mockedGetReport.mockResolvedValue(fakeReport);
     renderAt('r-xyz');

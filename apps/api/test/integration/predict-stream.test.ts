@@ -22,7 +22,9 @@ async function setupUser(email = 'a@b.com') {
 
 describe('POST /api/predict/stream', () => {
   beforeEach(async () => {
-    await env.DB.exec('DELETE FROM reports; DELETE FROM users;');
+    // H5: also clear rate_limits so each test gets a fresh 5/h register
+    // budget. Without this, the 6th test in the file would hit 429.
+    await env.DB.exec('DELETE FROM reports; DELETE FROM users; DELETE FROM rate_limits;');
   });
 
   it('401 when no JWT', async () => {
@@ -67,6 +69,27 @@ describe('POST /api/predict/stream', () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as any;
     expect(body.code).toBe('CONTENT_TOO_LONG');
+  });
+
+  // C1: whitelist + dedupe + length cap. A payload that lists only
+  // unknown platforms must be rejected with 400 INVALID_INPUT — the
+  // request never reaches the LLM orchestrator, so quota is not
+  // pre-charged either. (The whitelist contains exactly 3 platforms
+  // today, so the >3 length cap is unreachable in practice; the
+  // underlying branch still defends against a future whitelist grow.)
+  it('rejects payload where every platform is unknown with 400 INVALID_INPUT', async () => {
+    const { auth } = await setupUser();
+    const res = await app.request('/api/predict/stream', {
+      method: 'POST',
+      headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: { title: 'hello' },
+        platforms: ['nope-a', 'nope-b', 'nope-c'],
+      }),
+    }, env);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as any;
+    expect(body.code).toBe('INVALID_INPUT');
   });
 
   it('returns 402 QUOTA_EXHAUSTED when quota_used >= quota_limit', async () => {

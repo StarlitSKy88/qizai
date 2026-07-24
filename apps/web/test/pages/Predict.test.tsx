@@ -158,4 +158,32 @@ describe('Predict', () => {
     // Form must be unblocked after the error so the user can retry.
     expect(screen.getByRole('button')).not.toBeDisabled();
   });
+
+  // H3: 402 QUOTA_EXHAUSTED must surface a code-specific upgrade CTA,
+  // not the generic "请求失败" string. The error body is parsed; the
+  // server's message is preserved and the upgrade hint is appended.
+  it('shows the upgrade CTA on 402 QUOTA_EXHAUSTED', async () => {
+    const user = userEvent.setup();
+    mockedApiFetch.mockResolvedValue({
+      ok: false,
+      status: 402,
+      json: vi.fn().mockResolvedValue({
+        code: 'QUOTA_EXHAUSTED',
+        message: '本月配额已用完',
+      }),
+    } as unknown as Response);
+
+    render(
+      <MemoryRouter initialEntries={['/predict']}>
+        <Predict />
+      </MemoryRouter>,
+    );
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'test title');
+    await user.click(screen.getByRole('button'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('本月配额已用完');
+    expect(alert).toHaveTextContent('¥29');
+  });
 });
