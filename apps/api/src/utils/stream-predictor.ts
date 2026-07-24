@@ -192,15 +192,10 @@ export async function runPredictionStream(
       }),
     );
 
-    // T17: charge the user's quota only on a real completion (a report was
-    // generated and the D1 row was updated). The empty-platform guard above
-    // returns early, so no quota is charged for an empty sweep.
-    if (env.DB) {
-      await env.DB
-        .prepare(`UPDATE users SET quota_used = quota_used + 1 WHERE id = ?`)
-        .bind(userSub)
-        .run();
-    }
+    // C2: quota is pre-charged in predict.ts before this function runs. Do
+    // not charge again here — that would double-count. The empty-platform
+    // guard above returns early, so the pre-charge stays; the route's
+    // try/catch is responsible for refunding on any unexpected throw.
   } finally {
     clearInterval(heartbeatInterval);
   }

@@ -90,14 +90,30 @@ predictRouter.post('/stream', requireAuth, async (c) => {
     return c.json({ code: 'DB_NOT_CONFIGURED', message: 'D1 binding missing' }, 500);
   }
 
-  // T19: per-user monthly quota gate. Return 402 QUOTA_EXHAUSTED before any
-  // LLM work so the upgrade CTA can surface immediately. Skipped when DB is
-  // missing (handled by the DB_NOT_CONFIGURED branch above).
-  const quotaRow = await env.DB
-    .prepare('SELECT quota_used, quota_limit FROM users WHERE id = ?')
+  // C2 hardening: atomic pre-charge. The previous SELECT-then-check-then-
+  // increment had a TOCTOU race — two concurrent requests with quota_used=29
+  // would both pass the gate and both consume LLM cost. The single
+  // conditional UPDATE either moves the counter forward or returns 0
+  // changes, which we disambiguate into 401 vs 402 below.
+  const quotaResult = await env.DB
+    .prepare(
+      `UPDATE users
+       SET quota_used = quota_used + 1
+       WHERE id = ? AND quota_used < quota_limit`,
+    )
     .bind(user.sub)
-    .first<{ quota_used: number; quota_limit: number }>();
-  if (quotaRow && quotaRow.quota_used >= quotaRow.quota_limit) {
+    .run();
+  if (quotaResult.meta.changes === 0) {
+    // Either the user vanished (JWT stale) or quota was already at the
+    // ceiling. One follow-up SELECT distinguishes the two so we return
+    // the correct status code.
+    const userRow = await env.DB
+      .prepare('SELECT quota_used, quota_limit FROM users WHERE id = ?')
+      .bind(user.sub)
+      .first<{ quota_used: number; quota_limit: number }>();
+    if (!userRow) {
+      return c.json({ code: 'AUTH_REQUIRED', message: '请先登录' }, 401);
+    }
     return c.json(
       { code: 'QUOTA_EXHAUSTED', message: '本月配额已用完，¥29 升级 300 次/月' },
       402,
@@ -130,11 +146,35 @@ predictRouter.post('/stream', requireAuth, async (c) => {
         ),
       );
 
-      await runPredictionStream(env, user.sub, reportId, title, platforms, (event) => {
-        controller.enqueue(new TextEncoder().encode(event));
-      });
-
-      controller.close();
+      // C2: refund on any unexpected failure from the predictor. The
+      // pre-charge above already moved quota_used forward; if the LLM
+      // orchestrator blows up we must give the user that slot back so
+      // a transient blip does not silently consume their monthly quota.
+      try {
+        await runPredictionStream(env, user.sub, reportId, title, platforms, (event) => {
+          try {
+            controller.enqueue(new TextEncoder().encode(event));
+          } catch {
+            // Sink may be closed (client cancelled); nothing to do.
+          }
+        });
+      } catch (err) {
+        if (env.DB) {
+          await env.DB
+            .prepare(
+              'UPDATE users SET quota_used = quota_used - 1 WHERE id = ? AND quota_used > 0',
+            )
+            .bind(user.sub)
+            .run();
+        }
+        throw err;
+      } finally {
+        try {
+          controller.close();
+        } catch {
+          // Already closed (e.g. cancel fired); ignore.
+        }
+      }
     },
   });
 
