@@ -12,7 +12,7 @@
  *   - anything else → 返回的原始 status
  */
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle2, Loader2, AlertCircle, FileText } from 'lucide-react';
 import { getReport, type ReportDetail } from '../api/predictions';
 
@@ -63,9 +63,11 @@ function evidenceItems(evidence: unknown): Array<{ label: string; value: string 
 
 export default function Report() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [data, setData] = useState<ReportDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +80,7 @@ export default function Report() {
     }
     setLoading(true);
     setNotFound(false);
+    setErrorMessage(null);
     getReport(id)
       .then((d) => {
         if (cancelled) return;
@@ -85,14 +88,22 @@ export default function Report() {
       })
       .catch((err: { status?: number }) => {
         if (cancelled) return;
-        if (err?.status === 404) {
-          setNotFound(true);
-        } else {
-          // Other errors (network / 500) surface as a soft "未加载" state
-          // without locking the user out. Keep the page recoverable via
-          // a manual refresh.
-          setNotFound(false);
+        // H4: branch on status instead of treating every non-404 the same.
+        // 401 → login bounce. 403 + 404 → "报告不存在" (the user does not
+        // own this report; show the same not-found UX for parity). 500+
+        // → a recoverable error message so the page does not sit on
+        // "加载中…" forever.
+        if (err?.status === 401) {
+          navigate('/login?redirect=/report/' + id);
+          return;
         }
+        if (err?.status === 403 || err?.status === 404) {
+          setNotFound(true);
+          setLoading(false);
+          return;
+        }
+        setErrorMessage(`加载失败 (HTTP ${err?.status ?? '网络异常'})`);
+        setLoading(false);
       })
       .finally(() => {
         if (cancelled) return;
@@ -128,7 +139,29 @@ export default function Report() {
   if (loading || !data) {
     return (
       <div className="relative z-10 max-w-4xl mx-auto px-6 py-16 text-white">
-        <p className="text-white/60">加载中…</p>
+        {errorMessage ? (
+          <div
+            role="alert"
+            className="liquid-glass rounded-2xl p-6 border border-red-400/40 flex items-start gap-3 max-w-xl mx-auto"
+          >
+            <AlertCircle
+              size={20}
+              className="text-red-300 flex-shrink-0 mt-0.5"
+              aria-hidden="true"
+            />
+            <div className="flex-1">
+              <p className="text-white/90 text-sm leading-relaxed mb-3">{errorMessage}</p>
+              <Link
+                to="/predictions"
+                className="text-sm text-white/80 hover:text-white underline"
+              >
+                返回历史记录
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <p className="text-white/60">加载中…</p>
+        )}
       </div>
     );
   }

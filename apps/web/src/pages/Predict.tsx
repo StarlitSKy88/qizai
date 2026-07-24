@@ -33,9 +33,34 @@ export default function Predict() {
           platforms: ['xhs', 'tiktok', 'bilibili'],
         }),
       });
-      if (!res.ok || !res.body) {
-        // API error path — auth.ts (T25) will add toast surface later.
-        // For now, just unblock the form so the user can retry.
+      if (!res.ok) {
+        // H3: parse the server's code and branch on it. The pre-charge
+        // (C2) and cancel-handler (H2) mean these are now distinct UX
+        // paths — 402 needs the upgrade CTA, 401 needs the login bounce,
+        // 400 CONTENT_TOO_LONG shows the length warning.
+        let errBody: { code?: string; message?: string } = {};
+        try {
+          errBody = (await res.json()) as { code?: string; message?: string };
+        } catch {
+          // Body was not JSON; fall through to generic branch.
+        }
+        const code = errBody.code;
+        const message = errBody.message;
+        if (code === 'QUOTA_EXHAUSTED') {
+          setErrorMessage(`${message ?? '本月配额已用完'} → 升级 ¥29 套餐`);
+        } else if (code === 'AUTH_REQUIRED' || code === 'AUTH_FAILED') {
+          navigate('/login?redirect=/predict');
+          return;
+        } else if (code === 'CONTENT_TOO_LONG' || code === 'INVALID_INPUT') {
+          setErrorMessage(message ?? '请求内容有误');
+        } else if (code === 'DB_NOT_CONFIGURED') {
+          setErrorMessage('服务暂未就绪，请稍后重试');
+        } else {
+          setErrorMessage(message ?? `请求失败 (HTTP ${res.status})`);
+        }
+        return;
+      }
+      if (!res.body) {
         setErrorMessage('请求失败，请稍后重试');
         return;
       }
