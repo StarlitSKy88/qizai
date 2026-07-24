@@ -3,14 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
 export default function Predict() {
-  const [title, setTitle] = useState('');
   const [searchParams] = useSearchParams();
-
-  // Pre-fill title from ?title= query param
-  useState(() => {
-    const t = searchParams.get('title');
-    if (t) setTitle(t);
-  });
+  const initialTitle = searchParams.get('title') ?? '';
+  const [title, setTitle] = useState(initialTitle);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -26,12 +21,16 @@ export default function Predict() {
         预测你的内容会爆吗？
       </h1>
       <p className="text-white/80 text-lg text-center mb-12 leading-relaxed">
-        填写你的内容标题，小红书 / 抖音 / B站 一键预测，看看平台会给你多少流量。
+        粘贴标题、简介或正文，让 1000 个 persona 帮你投票决定要不要发布。 小红书 / 抖音 / B站 一键预测，给你可执行的发布建议。
       </p>
 
       <form className="max-w-xl mx-auto mb-16" onSubmit={handleSubmit}>
         <div className="liquid-glass rounded-full pl-6 pr-2 py-2 flex items-center gap-3">
+          <label htmlFor="predict-title" className="sr-only">
+            内容标题或正文
+          </label>
           <input
+            id="predict-title"
             type="text"
             value={title}
             onChange={e => setTitle(e.target.value)}
