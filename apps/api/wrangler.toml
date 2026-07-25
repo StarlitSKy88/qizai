@@ -6,6 +6,11 @@ ALIBABA_BAILIAN_MODEL = "qwen3.5-flash"
 FIREWORKS_MODEL = "qwen3p7-plus"
 DEEPSEEK_MODEL = "deepseek-v4-flash"
 JWT_SECRET = "dev-secret-replace-in-prod"
+# WeChat Pay V3 — public config (NOT secrets). Sandbox toggle for dev.
+# Real WXPAY_MCH_ID / WXPAY_API_KEY_V3 / WXPAY_PRIVATE_KEY / WXPAY_PLATFORM_CERT
+# / WXPAY_CERT_SERIAL must be set via `wrangler secret put <NAME>` in production.
+WXPAY_NOTIFY_URL = "https://api.qizai.app/api/checkout/callback"
+WXPAY_USE_SANDBOX = "false"
 
 [[d1_databases]]
 binding = "DB"
