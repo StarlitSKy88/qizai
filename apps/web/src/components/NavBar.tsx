@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Globe } from 'lucide-react';
+import QuotaBadge from './QuotaBadge';
 
 export default function NavBar() {
   return (
@@ -23,6 +24,7 @@ export default function NavBar() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          <QuotaBadge />
           <Link
             to="/predict"
             className="text-white text-sm font-medium"

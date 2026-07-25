@@ -88,3 +88,42 @@
 | T09 | mount smoke + regression verify | ✅ complete | a471b08 | Verification PASS: 20/20 tests, tsc clean, auth route mounted verified. Empty marker commit per brief. |
 | T10 | PR1 hygiene + ready marker | ✅ complete | 65187bf | PR1 READY (no remote origin — manual push+gh pr create needed). typecheck 0 errors, 20/20 tests, banned-copy 0 hits. |
 | T10-stop-hook | Stop hook review fixes | ✅ complete | 4b6f98e | Sonnet code-reviewer: 0 CRITICAL, 2 IMPORTANT (dev-secret prod guard + D1 FK enforcement), 5 MINOR (JWT bypass dead code / getEnv out of try / dead execSync+dirname / JWTPayload interface / test clearUsers). All 7 fixes applied in 1 commit. 20/20 tests, tsc clean. |
+
+## v0.15.1 Subagent-Driven Execution (2026-07-26)
+
+**Branch**: feature/v0151-rsa-verify-probe
+**Base**: b669e03 (v0.15.1 plan mid-flight fix: boot probe as Hono middleware)
+**Mode**: Subagent-Driven (Haiku implementer inline due to subagent team init failure; plan-level review gates preserved)
+**Spec**: docs/superpowers/specs/2026-07-26-qizai-v0151-rsa-verify-probe.md
+**Plan**: docs/superpowers/plans/2026-07-26-qizai-v0151-rsa-verify-probe.md
+
+| # | Task | Status | HEAD | Review |
+|---|------|--------|------|--------|
+| T01 | pemToDer in apps/api/src/utils/rsa-verify.ts (6 → 14 tests) | ✅ complete | a2b525a → aeb5348 (fix) | Hook review (code+security): 1 HIGH (Buffer.from silent-strip) + 1 MEDIUM (BEGIN/END independent) + 6 LOW. All 7 fixed in aeb5348. |
+| T02 | rsaVerifySha256 + 6 tests + pemToDer trim contract update | ✅ complete | 9130904 | Inline execute (subagent team init failed); 21/21 rsa-verify tests + 50/50 unit tests pass. Trim added per pre-flight analysis. Algorithm name `'RSA-PKCS1-v1_5'` → `'RSASSA-PKCS1-v1_5'` (Node spec-strict). |
+| T03 | verifyCallbackSignature wired to real RSA verify | ✅ complete | 27c1376 | Inline execute; 16/16 wechat-pay tests + 50/50 unit tests pass. 2 plan defects fixed: (1) trailing '\n' added to test sign message, (2) round-trip now uses REAL_PRIV matching REAL_PEM. |
+| T04 | Integration regression verify | ✅ complete | (no commit) | 101/101 tests pass pre-existing. TEST_ bypass preserves checkout.test.ts. |
+| T05 | boot probe via c.env (Hono middleware) | ✅ complete | 7a5320d | Inline execute; 50 unit + 45 integration tests pass. Hono middleware pattern preserves app.request for test infrastructure. |
+| T06 | boot probe integration tests (3 failure modes) | ✅ complete | b0e60b4 | Inline execute; 3/3 boot-probe tests + 48/48 integration tests pass. |
+| T07 | Final verification | ✅ complete | (no commit) | typecheck 0 errors; 104/104 full suite pass. Plan Step 3 manual sanity checks all PASS. Plan Step 3 line 1014 ('bootValidate called inside default.fetch before app.fetch') is stale — plan's own Task 5 deliberately chose Hono middleware over fetch wrapper; step 3 description didn't get updated. |
+
+## Reconciliations / Spec Deviations Recorded (v0.15.1)
+
+1. **T01 hook review (HIGH/MEDIUM/LOWs)**: All 8 findings applied in commit `aeb5348`. Critical: `Buffer.from(..., 'base64')` silent-strip → now pre-validated against `BASE64_RE`; missing BEGIN/END ordering + bytes-before-BEGIN leak → single regex with backreference `\1`. Plus 8 KB DoS cap, exact error message matching, 8 new edge-case tests (14 total).
+
+2. **T02 algorithm name fix**: Brief used `'RSA-PKCS1-v1_5'` (encrypt/decrypt name per Web Crypto spec); Node strict-following crypto.subtle rejects it. Switched to `'RSASSA-PKCS1-v1_5'` (sign/verify canonical name). Cloudflare Workers accepts both as a convenience; Node does not. CF compat preserved.
+
+3. **T02 trim contract update**: Brief Step 1 last test ('handles PEM with leading/trailing whitespace and CRLF') would fail against T01's strict `^...$` anchors. Decision: trim inside `pemToDer()` at function entry. Reasoning: every PEM parser in practice (openssl, Python cryptography, Go encoding/pem) tolerates surrounding whitespace; "input validation lenient, internal state strict." Added test case "trims surrounding whitespace before matching (T02 contract update)" to document the change.
+
+4. **T03 trailing newline**: Brief signed message without trailing `\n`; WXPay V3 spec requires `${ts}\n${nonce}\n${body}\n` (trailing `\n`). Added `\n` to test sign message.
+
+5. **T03 key confusion**: Brief round-trip test generated a SECOND `generateKeyPairSync` inside the test body and signed with that private key, but verified against `REAL_PEM` (the FIRST keypair's public key) — guaranteed false. Fixed by exporting `REAL_PRIV` alongside `REAL_PEM` from the module-level keypair and signing with `REAL_PRIV`.
+
+6. **T05 plan Step 3 stale**: Plan Step 3 line 1014 says 'bootValidate is called inside default.fetch before app.fetch'. This is incorrect — Task 5 Step 2 explicitly chose Hono middleware (`app.use('*', bootMiddleware)`) over a `{ fetch }` wrapper to preserve `app.request()` for vitest-pool-workers. Step 3 description was not updated to match. Skipped; the actual implementation is correct per the plan's own rationale.
+
+## Hooks / Quality Gates (v0.15.1)
+
+- ✅ `npm run typecheck` → 0 errors (verified post-b0e60b4)
+- ✅ `npm test` → 104/104 (50 unit + 54 integration including 3 new boot-probe)
+- ✅ Pre-commit prompt-injection scan → none triggered
+- ✅ Plan coverage: Goal 1 (real RSA) T01-03 ✅; Goal 2 (boot probe via c.env) T05-06 ✅; Goal 3 (TEST_ bypass compat) T03 preserves + T04 verifies ✅; Goal 4 (CI-locked prod guards) T03 unit tests + T06 integration tests ✅
