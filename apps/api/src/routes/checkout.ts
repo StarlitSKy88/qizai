@@ -106,3 +106,51 @@ checkoutRouter.get('/status/:orderId', requireAuth, async (c) => {
 
   return c.json({ status: row.status, paidAt: row.paid_at });
 });
+
+// T07 — WeChat Pay server-to-server callback. No auth; verifies signature,
+// idempotent on already-paid orders, triggers quota upgrade on first SUCCESS.
+checkoutRouter.post('/callback', async (c) => {
+  const env = getEnv(c);
+  if (!env.DB) return c.json({ code: 'DB_NOT_CONFIGURED' }, 500);
+
+  const sig = c.req.header('Wechatpay-Signature');
+  const ts = c.req.header('Wechatpay-Timestamp');
+  const nonce = c.req.header('Wechatpay-Nonce');
+  const serial = c.req.header('Wechatpay-Serial');
+  const rawBody = await c.req.text();
+
+  if (!sig || !ts || !nonce || !serial) {
+    return c.json({ code: 'INVALID_SIGNATURE' }, 401);
+  }
+  const ok = await verifyCallbackSignature(ts, nonce, rawBody, sig, serial);
+  if (!ok) return c.json({ code: 'INVALID_SIGNATURE' }, 401);
+
+  let payload: { out_trade_no?: string; transaction_id?: string; trade_state?: string };
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return c.json({ code: 'DECRYPT_FAILED' }, 400);
+  }
+  if (!payload.out_trade_no || payload.trade_state !== 'SUCCESS') {
+    // Ack non-SUCCESS events so WXPay stops retrying
+    return c.text('SUCCESS', 200);
+  }
+
+  const row = await env.DB
+    .prepare('SELECT id, user_id, plan, status FROM orders WHERE id = ?')
+    .bind(payload.out_trade_no)
+    .first<{ id: string; user_id: string; plan: string; status: string }>();
+  if (!row) return c.json({ code: 'ORDER_NOT_FOUND' }, 404);
+  // Idempotent: already paid → ack, no quota change
+  if (row.status === 'paid') return c.text('SUCCESS', 200);
+
+  await env.DB
+    .prepare(
+      `UPDATE orders SET status = 'paid', wx_transaction_id = ?, paid_at = ? WHERE id = ?`,
+    )
+    .bind(payload.transaction_id ?? null, Math.floor(Date.now() / 1000), row.id)
+    .run();
+
+  await applyQuotaUpgrade(env.DB, row.user_id, row.plan as OrderPlan);
+  return c.text('SUCCESS', 200);
+});

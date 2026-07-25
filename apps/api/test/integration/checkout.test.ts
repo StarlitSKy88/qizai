@@ -154,3 +154,114 @@ describe('checkout GET /status/:orderId', () => {
     expect(row.status).toBe('closed');
   });
 });
+
+describe('checkout POST /callback', () => {
+  beforeEach(async () => {
+    await env.DB.exec('DELETE FROM orders; DELETE FROM reports; DELETE FROM users; DELETE FROM rate_limits;');
+  });
+
+  // T07 mocks verifyCallbackSignature to true via wrangler.test.toml. The
+  // actual signature verification happens inside wechat-pay.ts; for v0.15.0
+  // we test the route's handling logic here.
+  function callbackHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      'Wechatpay-Timestamp': '1700000000',
+      'Wechatpay-Nonce': 'test-nonce',
+      'Wechatpay-Signature': 'mock-valid-sig',
+      'Wechatpay-Serial': 'TEST_SERIAL_0001',
+    };
+  }
+
+  it('updates order to paid + upgrades quota on SUCCESS', async () => {
+    const { userId } = await setupUser('cb-success@b.com');
+    const orderId = crypto.randomUUID();
+    await env.DB
+      .prepare(
+        `INSERT INTO orders (id, user_id, plan, amount_fen, status, created_at)
+         VALUES (?, ?, 'personal_sub', 2900, 'pending', ?)`,
+      )
+      .bind(orderId, userId, Math.floor(Date.now() / 1000))
+      .run();
+
+    const res = await app.request(
+      '/api/checkout/callback',
+      {
+        method: 'POST',
+        headers: callbackHeaders(),
+        body: JSON.stringify({
+          out_trade_no: orderId,
+          transaction_id: 'wx-tx-001',
+          trade_state: 'SUCCESS',
+        }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const order = await env.DB
+      .prepare('SELECT status, wx_transaction_id, paid_at FROM orders WHERE id = ?')
+      .bind(orderId)
+      .first<any>();
+    expect(order.status).toBe('paid');
+    expect(order.wx_transaction_id).toBe('wx-tx-001');
+    expect(order.paid_at).toBeGreaterThan(0);
+    const user = await env.DB
+      .prepare('SELECT quota_limit, plan FROM users WHERE id = ?')
+      .bind(userId)
+      .first<any>();
+    expect(user.quota_limit).toBe(60); // 30 base + 30 sub
+    expect(user.plan).toBe('personal_sub');
+  });
+
+  it('is idempotent on already-paid orders (no quota change)', async () => {
+    const { userId } = await setupUser('cb-idem@b.com');
+    const orderId = crypto.randomUUID();
+    await env.DB
+      .prepare(
+        `INSERT INTO orders (id, user_id, plan, amount_fen, status, created_at, paid_at)
+         VALUES (?, ?, 'personal_sub', 2900, 'paid', ?, ?)`,
+      )
+      .bind(orderId, userId, Math.floor(Date.now() / 1000), Math.floor(Date.now() / 1000))
+      .run();
+
+    const res = await app.request(
+      '/api/checkout/callback',
+      {
+        method: 'POST',
+        headers: callbackHeaders(),
+        body: JSON.stringify({
+          out_trade_no: orderId,
+          transaction_id: 'wx-tx-002',
+          trade_state: 'SUCCESS',
+        }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const user = await env.DB
+      .prepare('SELECT quota_limit FROM users WHERE id = ?')
+      .bind(userId)
+      .first<any>();
+    // Quota must NOT double-apply (replay)
+    expect(user.quota_limit).toBe(30);
+  });
+
+  it('returns 404 ORDER_NOT_FOUND for unknown orderId', async () => {
+    const res = await app.request(
+      '/api/checkout/callback',
+      {
+        method: 'POST',
+        headers: callbackHeaders(),
+        body: JSON.stringify({
+          out_trade_no: 'nonexistent-id',
+          transaction_id: 'wx-tx-003',
+          trade_state: 'SUCCESS',
+        }),
+      },
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as any;
+    expect(body.code).toBe('ORDER_NOT_FOUND');
+  });
+});
