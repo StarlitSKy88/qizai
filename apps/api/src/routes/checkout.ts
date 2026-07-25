@@ -187,7 +187,7 @@ checkoutRouter.post('/callback', async (c) => {
   // 200 (we've restored the original pending state, WXPay should retry the
   // callback and we'll re-enter the CAS path on the next attempt).
   try {
-    await applyQuotaUpgrade(env.DB, row.user_id, row.plan as OrderPlan);
+    await applyQuotaUpgrade(env.DB, row.user_id, row.plan as OrderPlan, row.id);
   } catch (quotaErr) {
     console.error('[checkout/callback] quota upgrade failed, rolling back', {
       orderId: row.id,
@@ -197,9 +197,15 @@ checkoutRouter.post('/callback', async (c) => {
     });
     let rolledBack = false;
     try {
+      // CAS rollback flips status AND clears wx_transaction_id + paid_at so
+      // the next WXPay retry has a clean slate. Preserving tx_id on rollback
+      // would silently overwrite the new (correct) tx_id on the next attempt
+      // and lose the audit trail between attempts.
       const rb = await env.DB
         .prepare(
-          `UPDATE orders SET status = 'pending' WHERE id = ? AND status = 'paid'`,
+          `UPDATE orders
+             SET status = 'pending', wx_transaction_id = NULL, paid_at = NULL
+           WHERE id = ? AND status = 'paid'`,
         )
         .bind(row.id)
         .run();

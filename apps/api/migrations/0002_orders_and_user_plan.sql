@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS orders (
   wx_transaction_id TEXT,
   created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
   paid_at INTEGER,
+  quota_granted_at INTEGER,
   expires_at INTEGER,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
