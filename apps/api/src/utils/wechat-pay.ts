@@ -84,7 +84,13 @@ export async function verifyCallbackSignature(
   // verification. The serial header is attacker-controlled; this gate is
   // the only thing preventing a bypass of HMAC+PKCS#1 v1.5 RSA.
   if (env.WXPAY_USE_SANDBOX && certSerial.startsWith('TEST_')) return true;
-  return false;
+  // v0.15.0 stub: the real PKCS#1 v1.5 RSA verifier is v0.15.1 work.
+  // Until then, prod deploys that somehow bypassed the sandbox gate would
+  // silently accept NO real callbacks (every one returns false → 401) —
+  // a revenue-impacting outage masquerading as a security control. Throw
+  // loudly here so the gap is visible at the first production callback
+  // rather than surfacing as 'paid orders never upgrade quota'.
+  throw new Error('WXPAY_VERIFY_NOT_IMPLEMENTED');
 }
 
 export interface UnifiedorderResult {

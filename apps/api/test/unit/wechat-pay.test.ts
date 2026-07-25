@@ -63,7 +63,7 @@ describe('wechat-pay.signV3', () => {
   });
 });
 
-describe('wechat-pay.verifyCallbackSignature bypass gate', () => {
+describe('wechat-pay.verifyCallbackSignature prod/staging gate', () => {
   // CI lock: locks the prod bypass gate. If a future contributor removes
   // the env.WXPAY_USE_SANDBOX check (or short-circuits the function back
   // to "always return true"), these tests fail and force a manual review.
@@ -75,18 +75,26 @@ describe('wechat-pay.verifyCallbackSignature bypass gate', () => {
     expect(ok).toBe(true);
   });
 
-  it('rejects TEST_ serial in prod (security gate)', async () => {
-    const ok = await verifyCallbackSignature('t', 'n', 'b', 'sig', 'TEST_anything', prodEnv);
-    expect(ok).toBe(false);
+  it('throws WXPAY_VERIFY_NOT_IMPLEMENTED on TEST_ serial in prod', async () => {
+    // v0.15.0: prod path is a stub. We MUST throw loudly so a prod deploy
+    // that bypassed the sandbox gate surfaces immediately rather than
+    // silently rejecting every real WXPay callback (revenue impact).
+    await expect(
+      verifyCallbackSignature('t', 'n', 'b', 'sig', 'TEST_anything', prodEnv),
+    ).rejects.toThrow('WXPAY_VERIFY_NOT_IMPLEMENTED');
   });
 
-  it('rejects non-TEST_ serial in sandbox', async () => {
-    const ok = await verifyCallbackSignature('t', 'n', 'b', 'sig', 'WXPAY_REAL_SERIAL_12345', sandboxEnv);
-    expect(ok).toBe(false);
+  it('throws WXPAY_VERIFY_NOT_IMPLEMENTED on real serial in prod', async () => {
+    await expect(
+      verifyCallbackSignature('t', 'n', 'b', 'sig', 'WXPAY_REAL_SERIAL_12345', prodEnv),
+    ).rejects.toThrow('WXPAY_VERIFY_NOT_IMPLEMENTED');
   });
 
-  it('rejects non-TEST_ serial in prod', async () => {
-    const ok = await verifyCallbackSignature('t', 'n', 'b', 'sig', 'WXPAY_REAL_SERIAL_12345', prodEnv);
-    expect(ok).toBe(false);
+  it('throws WXPAY_VERIFY_NOT_IMPLEMENTED on real serial in sandbox', async () => {
+    // Real serial in sandbox: still a stub. The bypass only covers TEST_
+    // sentinels; production-shape serials need the real RSA verifier.
+    await expect(
+      verifyCallbackSignature('t', 'n', 'b', 'sig', 'WXPAY_REAL_SERIAL_12345', sandboxEnv),
+    ).rejects.toThrow('WXPAY_VERIFY_NOT_IMPLEMENTED');
   });
 });
