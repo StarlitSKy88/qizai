@@ -173,4 +173,47 @@ describe('Login', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/predict');
     });
   });
+
+  it('falls back to /predict for a whitespace-prefixed redirect after login', async () => {
+    // Defense in depth: `   /evil.com` is not a valid path, browsers
+    // may normalize it; safeRedirect rejects it because it does not
+    // start with `/`.
+    mockedLogin.mockResolvedValue({ userId: 'u-1', token: 'jwt-1' });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={['/login?redirect=%20%20%20/evil.com']}>
+        <Login />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText('邮箱'), 'a@b.com');
+    await user.type(screen.getByLabelText('密码'), 'hunter2');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/predict');
+    });
+  });
+
+  it('treats pseudo-scheme paths (e.g. /javascript:alert(1)) as in-app paths', async () => {
+    // react-router@6 treats anything starting with `/` as a path, so
+    // pseudo-schemes stay in-app and never reach a real URL parser.
+    mockedLogin.mockResolvedValue({ userId: 'u-1', token: 'jwt-1' });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={['/login?redirect=/javascript:alert(1)']}>
+        <Login />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText('邮箱'), 'a@b.com');
+    await user.type(screen.getByLabelText('密码'), 'hunter2');
+    await user.click(screen.getByRole('button', { name: '登录' }));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/javascript:alert(1)');
+    });
+  });
 });
