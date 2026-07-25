@@ -36,6 +36,11 @@ export default function BuyModal({ onClose }: BuyModalProps) {
   const [qr, setQr] = useState<CheckoutResponse | null>(null);
   const [countdown, setCountdown] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+  // Tracks non-pending terminal states so the modal can render a recovery
+  // panel instead of leaving the user staring at an expired QR. Set when
+  // the polling effect bails on a 'closed' / 'refunded' response or when
+  // the local countdown reaches zero without a 'paid' callback.
+  const [closedState, setClosedState] = useState<null | 'expired' | 'closed' | 'refunded'>(null);
 
   // Poll order status every 5s; close on paid.
   useEffect(() => {
@@ -45,6 +50,7 @@ export default function BuyModal({ onClose }: BuyModalProps) {
       // auto-closed (or is about to) and we shouldn't keep hammering it.
       if (Math.floor(Date.now() / 1000) >= qr.expiresAt) {
         clearInterval(interval);
+        setClosedState('expired');
         return;
       }
       try {
@@ -52,11 +58,14 @@ export default function BuyModal({ onClose }: BuyModalProps) {
         if (status.status === 'paid') {
           clearInterval(interval);
           onClose();
-        } else if (status.status !== 'pending') {
-          // closed / refunded / unknown non-terminal state — stop polling
-          // so we don't leak timers and pound a dead order endpoint.
+        } else if (status.status === 'closed') {
           clearInterval(interval);
+          setClosedState('closed');
+        } else if (status.status === 'refunded') {
+          clearInterval(interval);
+          setClosedState('refunded');
         }
+        // 'pending' keeps polling
       } catch {
         // network blip — keep trying
       }
@@ -77,6 +86,7 @@ export default function BuyModal({ onClose }: BuyModalProps) {
 
   const handleSelectPlan = async (plan: CheckoutPlan) => {
     setError(null);
+    setClosedState(null);
     try {
       const res = await createCheckout(plan);
       setQr(res);
@@ -84,6 +94,16 @@ export default function BuyModal({ onClose }: BuyModalProps) {
     } catch (err) {
       setError('网络异常，请稍后重试');
     }
+  };
+
+  // After a closed/expired/refunded order, let the user re-select a plan
+  // without leaving the modal. Resets local order state so handleSelectPlan
+  // can mint a fresh order from the same plan picker.
+  const handleReselect = () => {
+    setQr(null);
+    setClosedState(null);
+    setCountdown(0);
+    setError(null);
   };
 
   return (
@@ -102,7 +122,24 @@ export default function BuyModal({ onClose }: BuyModalProps) {
         </button>
         <h2 className="text-2xl font-bold mb-6 text-white">升级套餐</h2>
 
-        {qr ? (
+        {qr && closedState ? (
+          <div className="flex flex-col items-center gap-4" role="status">
+            <div className="w-48 h-48 bg-white/10 rounded-lg flex items-center justify-center text-white/70 text-sm">
+              {closedState === 'expired' && '订单已超时'}
+              {closedState === 'closed' && '订单已关闭'}
+              {closedState === 'refunded' && '订单已退款'}
+            </div>
+            <p className="text-sm text-white/70 text-center">
+              请重新选择套餐，生成新的支付订单
+            </p>
+            <button
+              onClick={handleReselect}
+              className="w-full bg-white text-black rounded-xl py-3 font-medium hover:bg-white/90 transition-colors"
+            >
+              重新选择套餐
+            </button>
+          </div>
+        ) : qr ? (
           <div className="flex flex-col items-center gap-4">
             {qr.qrCodeBase64.startsWith('data:image') ? (
               <img src={qr.qrCodeBase64} alt="微信支付二维码" className="w-48 h-48 bg-white rounded-lg" />
