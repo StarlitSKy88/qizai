@@ -6,9 +6,9 @@
 // Functions:
 //   - signV3(method, urlPath, body, ts, nonce)            → lowercase hex HMAC-SHA256
 //   - verifyCallbackSignature(ts, nonce, body, sig, serial) → boolean (RSA in prod;
-//                                                             stubbed false in dev;
-//                                                             integration tests
-//                                                             mock it to true)
+//                                                             TEST_ sandbox bypass;
+//                                                             integration tests mock
+//                                                             it to true for stubs)
 //   - unifiedorderNative(env, orderId, amountFen, ...)     → { code_url, qr_code_base64 }
 //   - queryOrderStatus(env, orderId)                       → { status, transaction_id } | null
 //
@@ -22,6 +22,7 @@
 // For v0.15.0 MVP, callback body is plain JSON (we register notify_url with
 // sensitive_data=noenc flag), so we parse JSON directly after verifyCallbackSignature.
 import type { AppEnv } from './env';
+import { rsaVerifySha256 } from './rsa-verify';
 
 const SANDBOX_HOST = 'https://api.mch.weixin.qq.com/sandboxnew';
 const PROD_HOST = 'https://api.mch.weixin.qq.com';
@@ -63,16 +64,13 @@ export async function signV3(
 }
 
 export async function verifyCallbackSignature(
-  _timestamp: string,
-  _nonce: string,
-  _body: string,
-  _signature: string,
+  timestamp: string,
+  nonce: string,
+  body: string,
+  signature: string,
   certSerial: string,
-  env: Pick<AppEnv, 'WXPAY_USE_SANDBOX'>,
+  env: Pick<AppEnv, 'WXPAY_USE_SANDBOX' | 'WXPAY_PLATFORM_CERT'>,
 ): Promise<boolean> {
-  // Production: load WXPAY_PLATFORM_CERT by serial, RSA-verify signature
-  // over `${timestamp}\n${nonce}\n${body}\n` (PKCS#1 v1.5).
-  //
   // Test sentinel: when WXPAY_CERT_SERIAL starts with "TEST_", bypass
   // verification. This avoids the need for vi.mock in vitest-pool-workers
   // (which lacks module-mock support — see T16 in v0.14 ledger). Production
@@ -84,13 +82,22 @@ export async function verifyCallbackSignature(
   // verification. The serial header is attacker-controlled; this gate is
   // the only thing preventing a bypass of HMAC+PKCS#1 v1.5 RSA.
   if (env.WXPAY_USE_SANDBOX && certSerial.startsWith('TEST_')) return true;
-  // v0.15.0 stub: the real PKCS#1 v1.5 RSA verifier is v0.15.1 work.
-  // Until then, prod deploys that somehow bypassed the sandbox gate would
-  // silently accept NO real callbacks (every one returns false → 401) —
-  // a revenue-impacting outage masquerading as a security control. Throw
-  // loudly here so the gap is visible at the first production callback
-  // rather than surfacing as 'paid orders never upgrade quota'.
-  throw new Error('WXPAY_VERIFY_NOT_IMPLEMENTED');
+
+  // Production path: real PKCS#1 v1.5 RSA-2048 + SHA-256 verification.
+  // The WXPay V3 signature scheme signs `${timestamp}\n${nonce}\n${body}\n`
+  // using the platform certificate's RSA private key; we verify with the
+  // public key stored in WXPAY_PLATFORM_CERT.
+  if (!env.WXPAY_PLATFORM_CERT) {
+    // Loud failure: missing cert in prod means signature verification
+    // cannot proceed. Throwing here surfaces as WXPAY_PLATFORM_CERT_MISSING
+    // 500 to WXPay → retry storm → ops sees the pattern and injects the
+    // cert via `wrangler secret put`. Better than silent false (which
+    // would reject every real callback with no actionable signal).
+    throw new Error('WXPAY_PLATFORM_CERT_MISSING');
+  }
+
+  const message = `${timestamp}\n${nonce}\n${body}\n`;
+  return await rsaVerifySha256(env.WXPAY_PLATFORM_CERT, message, signature);
 }
 
 export interface UnifiedorderResult {
