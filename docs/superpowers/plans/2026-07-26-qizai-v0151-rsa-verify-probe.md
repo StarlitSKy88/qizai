@@ -652,7 +652,7 @@ No production code paths exercised by integration tests."
 Run: `Read /Users/opc-1/Downloads/O/qizai/apps/api/src/index.ts`
 Verify lines 1-46 are unchanged since last read. If different, the spec mismatch is a flag — stop and re-read.
 
-- [ ] **Step 2: Add the `bootValidate` function and module state**
+- [ ] **Step 2: Add the `bootValidate` function, module state, and Hono middleware**
 
 Edit `apps/api/src/index.ts` to **replace the entire file** with this exact content:
 
@@ -666,18 +666,24 @@ Edit `apps/api/src/index.ts` to **replace the entire file** with this exact cont
 // v0.15.1 — Boot probe via c.env:
 //   Cloudflare Workers does NOT populate `process.env` from `wrangler secret
 //   put` — secrets are bound via the worker context (c.env), not process.env.
-//   The vitest-startup `parseEnv` probe below (lines 38-50) only sees
+//   The vitest-startup `parseEnv` probe below (lines 49-61) only sees
 //   process.env, which is the dev/test fallback. The real prod-guard runs
-//   on the first request via bootValidate() in the default.fetch wrapper
-//   (lines 24-32): we parse c.env once per isolate, log a loud console.error
-//   on misconfiguration, and let getEnv(c) throw per-request thereafter.
+//   on the first request via bootMiddleware (lines 32-43): we parse c.env
+//   once per isolate, log a loud console.error on misconfiguration, and let
+//   getEnv(c) throw per-request thereafter.
 //
-//   We do NOT throw from bootValidate: throwing would cascade to all
-//   routes in this isolate returning 503, which is worse than per-route
-//   500 with actionable error logs. getEnv(c) is the actual enforcement
-//   gate; bootValidate is observability.
+//   We do NOT throw from bootMiddleware: throwing would cascade to all
+//   routes returning 503, which is worse than per-route 500 with actionable
+//   error logs. getEnv(c) is the actual enforcement gate; bootMiddleware
+//   is observability.
+//
+//   Implementation note: we keep `export default app` (Hono instance) so
+//   integration tests can keep using `app.request('/path', {}, env)`. The
+//   boot probe is a Hono middleware that fires on the first request —
+//   this is the standard Hono way to access c.env at request time without
+//   breaking the test infrastructure that vitest-pool-workers 0.18 expects.
 
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { authRouter } from './routes/auth';
 import { simulateRouter } from './routes/simulate';
 import { reportRouter } from './routes/report';
@@ -689,11 +695,11 @@ import { parseEnv, type AppEnv } from './utils/env';
 const app = new Hono();
 
 // ──────────────────────────────────────────────────────────────────
-// Boot probe state + helper (v0.15.1)
+// Boot probe state + middleware (v0.15.1)
 // ──────────────────────────────────────────────────────────────────
 
 interface BootState {
-  /** True after the first call to bootValidate(). Prevents re-running. */
+  /** True after the first call to bootMiddleware(). Prevents re-running. */
   validated: boolean;
   /** True if parseEnv(env) succeeded on the first call. */
   valid: boolean;
@@ -704,34 +710,39 @@ interface BootState {
 const boot: BootState = { validated: false, valid: true };
 
 /**
- * Run parseEnv against c.env the FIRST time this Workers isolate handles a
- * request. Caches the result; subsequent calls short-circuit. Logs a loud
- * console.error on misconfiguration so ops can grep Logpush.
+ * Hono middleware that runs parseEnv(c.env) on the FIRST request to this
+ * Workers isolate, caches the result, and logs a loud console.error on
+ * misconfiguration. Subsequent requests short-circuit.
  *
- * Why one-shot per isolate: parseEnv is pure (no I/O, no side effects beyond
- * validation), and Workers isolates handle many requests before being recycled.
- * Re-running on every request would add ~µs of overhead per call without
- * adding signal. If the isolate is recycled (rare; CF manages isolate lifecycle),
- * boot.validated resets to false and we re-run on the next request — harmless.
+ * Why middleware (not a fetch wrapper): vitest-pool-workers 0.18 imports
+ * `default` and calls `app.request(req, env, ctx)`. A `{ fetch }` wrapper
+ * would break `app.request` semantics; middleware preserves it.
  *
  * Why we don't throw: see header comment. Per-route 500 from getEnv(c) is
  * the actionable failure mode; this hook is for ops visibility.
  */
-function bootValidate(env: AppEnv): void {
-  if (boot.validated) return;
-  boot.validated = true;
-  try {
-    parseEnv(env);
-    boot.valid = true;
-  } catch (err) {
-    boot.valid = false;
-    boot.error = err;
-    console.error(
-      '[index] boot-time parseEnv FAILED on first request via c.env — runtime guards will still throw on each request',
-      err instanceof Error ? err.message : String(err),
-    );
+const bootMiddleware: MiddlewareHandler = async (c, next) => {
+  if (!boot.validated) {
+    boot.validated = true;
+    try {
+      parseEnv(c.env as unknown as AppEnv);
+      boot.valid = true;
+    } catch (err) {
+      boot.valid = false;
+      boot.error = err;
+      console.error(
+        '[index] boot-time parseEnv FAILED on first request via c.env — runtime guards will still throw on each request',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
   }
-}
+  await next();
+};
+
+// Apply boot middleware FIRST so it fires before any route's requireAuth
+// (which calls getEnv(c) and throws on misconfig). The middleware is a
+// no-op after the first call, so no per-request cost.
+app.use('*', bootMiddleware);
 
 // ──────────────────────────────────────────────────────────────────
 // Routes
@@ -758,11 +769,11 @@ app.get('/', (c) => c.json({ status: 'qizai-api-ok' }));
 // and uses the fallback literal → prod guards never fire here.
 //
 // The real prod enforcement happens via:
-//   1. bootValidate() in default.fetch (above) — one-shot per isolate
+//   1. bootMiddleware above — one-shot per isolate, fires on first request
 //   2. getEnv(c) in every route — per-request enforcement
 //
 // If a future contributor wants to remove this probe entirely, that's
-// safe — bootValidate covers the prod path. Keeping it catches dev-env
+// safe — bootMiddleware covers the prod path. Keeping it catches dev-env
 // regressions at module-load time.
 try {
   parseEnv({ JWT_SECRET: process.env.JWT_SECRET ?? 'test-secret-isolated-from-dev' });
@@ -774,29 +785,19 @@ try {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// Workers entrypoint with boot probe
+// Export — keep Hono app instance for test infrastructure compat
 // ──────────────────────────────────────────────────────────────────
 //
-// vitest-pool-workers imports `default` and calls `app.fetch(req, env, ctx)`.
-// We wrap default so the first fetch call hits bootValidate(env) before
-// routing — this is the only way to see c.env at module-level scope in CF.
+// vitest-pool-workers imports `default` and expects Hono's app.request
+// signature (used by every integration test in test/integration/*.test.ts).
+// The CF Workers runtime also accepts Hono's app directly — Wrangler's
+// main entry can be a Hono instance because Hono's app.fetch matches the
+// Workers fetch handler signature.
 //
-// Export shape: `{ fetch: async (req, env, ctx) => { bootValidate(env); return app.fetch(req, env, ctx); } }`
-//
-// Note: Hono's app.fetch signature is `(req, env, ctx) => Promise<Response>`.
-// We cast env to AppEnv at the boundary — parseEnv normalizes any extra
-// fields silently (YAGNI: we don't need a stricter contract here).
+// If we ever need a custom wrapper, do it in wrangler.toml's main field
+// rather than changing this default export.
 
-export default {
-  async fetch(
-    req: Request,
-    env: Record<string, unknown>,
-    ctx: ExecutionContext,
-  ): Promise<Response> {
-    bootValidate(env as unknown as AppEnv);
-    return app.fetch(req, env as any, ctx);
-  },
-};
+export default app;
 ```
 
 - [ ] **Step 3: Run typecheck**
@@ -812,9 +813,7 @@ Expected: PASS — all unit tests pass
 - [ ] **Step 5: Run integration tests**
 
 Run: `cd apps/api && npm test -- test/integration/`
-Expected: PASS — all integration tests pass
-
-If integration tests fail because the export shape changed from a Hono app instance to a `{ fetch }` object, check that vitest-pool-workers 0.18 supports this export shape. If not, the fix is to wrap differently — but this is the standard Workers export pattern and should work. Debug case-by-case.
+Expected: PASS — all integration tests pass (bootMiddleware fires on the first request of each test, no export shape breakage)
 
 - [ ] **Step 6: Commit**
 
@@ -825,14 +824,19 @@ git commit -m "feat(api): boot probe via c.env (v0.15.1)
 Cloudflare Workers doesn't populate process.env from wrangler secret put,
 so the v0.15.0 round-6 honest comment on index.ts:23-34 documented that
 the probe only catches vitest startup, not prod. This commit wires the
-real prod probe via bootValidate() in the default.fetch wrapper.
+real prod probe via bootMiddleware (Hono middleware, not fetch wrapper).
+
+Why middleware not fetch wrapper: vitest-pool-workers 0.18 imports default
+and calls app.request(req, env, ctx). A { fetch } wrapper would break
+app.request semantics; middleware preserves the test infrastructure.
 
 Architecture:
 - boot: { validated, valid, error? } module-level state
-- bootValidate(env): one-shot per isolate; logs console.error loud on
+- bootMiddleware: one-shot per isolate; logs console.error loud on
   parseEnv failure; does NOT throw (per-route 500 from getEnv(c) is the
   actionable failure mode)
-- default export wraps Hono app.fetch: bootValidate(env) → app.fetch(req, env, ctx)
+- app.use('*', bootMiddleware) fires on every request, short-circuits
+  after first call
 
 Existing process.env probe kept as vitest-startup sanity check (its only
 remaining use case after this commit).
@@ -862,7 +866,7 @@ Create `apps/api/test/integration/boot-probe.test.ts` with this exact content:
 //
 // MODULE-STATE CAVEAT: vitest-pool-workers shares module state across
 // tests in the same worker isolate. The boot object sets `validated =
-// true` after the first call, so subsequent tests' bootValidate() calls
+// true` after the first call, so subsequent tests' bootMiddleware calls
 // short-circuit. This is the EXPECTED production behavior (one-shot per
 // isolate) — we just verify the FIRST probe fires loudly. Subsequent
 // misconfigurations are still caught by getEnv(c) per-request.
