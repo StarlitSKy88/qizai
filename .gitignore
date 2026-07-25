@@ -14,3 +14,11 @@ coverage/
 # SDD scratch (Subagent-Driven Development progress ledger)
 .superpowers/
 graphify-out/
+
+# Playwright diagnostics (per-failure screenshots / traces / last-run.json).
+# apps/web/.gitignore already excludes /test-results/ inside the web
+# workspace; this covers the case where a test is invoked from a parent
+# cwd and Playwright writes the artefact at the project root.
+test-results/
+playwright-report/
+apps/api/test-results/
