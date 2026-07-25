@@ -41,11 +41,21 @@ export default function BuyModal({ onClose }: BuyModalProps) {
   useEffect(() => {
     if (!qr) return;
     const interval = setInterval(async () => {
+      // Stop polling once the local countdown is up — the server has
+      // auto-closed (or is about to) and we shouldn't keep hammering it.
+      if (Math.floor(Date.now() / 1000) >= qr.expiresAt) {
+        clearInterval(interval);
+        return;
+      }
       try {
         const status = await pollOrderStatus(qr.orderId);
         if (status.status === 'paid') {
           clearInterval(interval);
           onClose();
+        } else if (status.status !== 'pending') {
+          // closed / refunded / unknown non-terminal state — stop polling
+          // so we don't leak timers and pound a dead order endpoint.
+          clearInterval(interval);
         }
       } catch {
         // network blip — keep trying
