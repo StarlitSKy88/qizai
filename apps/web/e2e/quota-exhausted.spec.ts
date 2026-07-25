@@ -28,9 +28,9 @@ test.describe('quota-exhausted (T40)', () => {
 
     // --- 1. Sign up via the real UI (requires API). ---
     await page.goto('/signup');
-    await page.getByLabel('邮箱').fill(email);
-    await page.getByLabel('密码', { exact: true }).fill(password);
-    await page.getByLabel('确认密码').fill(password);
+    await page.locator('#signup-email').fill(email);
+    await page.locator('#signup-password').fill(password);
+    await page.locator('#signup-confirm').fill(password);
 
     const signupResp = page.waitForResponse((r) =>
       r.url().includes('/api/auth/register'),

@@ -33,7 +33,9 @@ test.describe('auth-gate (T39)', () => {
     await page.getByRole('button').filter({ has: page.locator('svg') }).click();
 
     // Expect redirect to /login with the deep-link return param.
-    await expect(page).toHaveURL(/\/login\?redirect=%2Fpredict/, {
+    // The router stores the return path unencoded in `?redirect=/predict`
+    // (URL-decoded form); the regex matches both encoded and decoded.
+    await expect(page).toHaveURL(/\/login\?redirect=(?:%2F|\/)predict/, {
       timeout: 5_000,
     });
 

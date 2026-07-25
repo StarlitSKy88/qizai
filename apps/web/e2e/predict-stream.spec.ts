@@ -49,9 +49,9 @@ test.describe('predict-stream (T38)', () => {
     const signupResp = page.waitForResponse((r) =>
       r.url().includes('/api/auth/register'),
     );
-    await page.getByLabel('邮箱').fill(email);
-    await page.getByLabel('密码', { exact: true }).fill(password);
-    await page.getByLabel('确认密码').fill(password);
+    await page.locator('#signup-email').fill(email);
+    await page.locator('#signup-password').fill(password);
+    await page.locator('#signup-confirm').fill(password);
     await page.getByRole('button', { name: '注册' }).click();
     const signedUp = await signupResp;
     test.skip(!signedUp.ok() && signedUp.status() === 0, 'requires API');

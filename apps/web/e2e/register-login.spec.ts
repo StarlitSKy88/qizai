@@ -28,9 +28,13 @@ test.describe('register-login (T37)', () => {
 
     await page.goto('/signup');
 
-    await page.getByLabel('邮箱').fill(email);
-    await page.getByLabel('密码', { exact: true }).fill(password);
-    await page.getByLabel('确认密码').fill(password);
+    // Signup.tsx uses <label for="signup-X"> + <input id="signup-X"> as
+    // sibling elements rather than the label wrapping the input. That's
+    // valid HTML but Playwright's `getByLabel` prefers the wrapping form;
+    // we target inputs by their stable id instead.
+    await page.locator('#signup-email').fill(email);
+    await page.locator('#signup-password').fill(password);
+    await page.locator('#signup-confirm').fill(password);
 
     // Capture the API response so we can give a clearer failure if the
     // back-end rejects (e.g. EMAIL_TAKEN if a previous run leaked the
@@ -64,9 +68,9 @@ test.describe('register-login (T37)', () => {
   }) => {
     await page.goto('/signup');
 
-    await page.getByLabel('邮箱').fill(uniqueEmail());
-    await page.getByLabel('密码', { exact: true }).fill('hunter22');
-    await page.getByLabel('确认密码').fill('different22');
+    await page.locator('#signup-email').fill(uniqueEmail());
+    await page.locator('#signup-password').fill('hunter22');
+    await page.locator('#signup-confirm').fill('different22');
 
     await page.getByRole('button', { name: '注册' }).click();
 
