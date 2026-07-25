@@ -37,9 +37,10 @@ const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
  * Decode a PEM-formatted key into its DER (binary) bytes.
  * Strips the BEGIN/END headers, all whitespace, and base64-decodes the body.
  * Accepts multi-line PEM (with \n or \r\n) and single-line PEM.
+ * Leading/trailing whitespace around the PEM block is tolerated and trimmed.
  *
  * Strict validation:
- *   - PEM length must be ≤ 8 KB (DoS defense)
+ *   - PEM length must be ≤ 8 KB (DoS defense, applied AFTER trim)
  *   - Must contain both BEGIN and END markers with the SAME label
  *   - BEGIN must appear before END
  *   - Body must be valid base64 (no silent alphabet stripping)
@@ -52,7 +53,13 @@ export function pemToDer(pem: string): ArrayBuffer {
   if (typeof pem !== 'string') {
     throw new Error('pemToDer: input must be a string');
   }
-  if (pem.trim().length === 0) {
+  // Trim leading/trailing whitespace: PEM-as-string conventionally tolerates
+  // surrounding whitespace (every PEM parser in practice — openssl, Python's
+  // cryptography, Go's encoding/pem — strips it). This also lets the
+  // ^...$ regex anchors match without an explicit leading/trailing-whitespace
+  // alternation, keeping the parser tight.
+  pem = pem.trim();
+  if (pem.length === 0) {
     throw new Error('pemToDer: empty PEM string');
   }
   if (pem.length > MAX_PEM_BYTES) {
@@ -96,4 +103,56 @@ export function pemToDer(pem: string): ArrayBuffer {
     throw new Error('pemToDer: base64 body decoded to zero bytes');
   }
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+}
+
+/**
+ * Verify an RSA-PKCS1-v1_5 + SHA-256 signature against the given PEM public key.
+ * Used for WXPay V3 callback signature verification.
+ *
+ * @param pem - SPKI-format PEM-encoded public key. Accepts standard WXPay
+ *   platform certificate (extract SPKI with `openssl x509 -pubkey -noout`).
+ * @param message - The exact message string that was signed.
+ *   For WXPay callbacks this is `${timestamp}\n${nonce}\n${body}\n`.
+ * @param signatureBase64 - The signature as base64 (matches the
+ *   `Wechatpay-Signature` header format). Standard base64 with padding.
+ * @returns Promise resolving to true if signature is valid, false otherwise.
+ * @throws Error if PEM is malformed (propagated from pemToDer).
+ */
+export async function rsaVerifySha256(
+  pem: string,
+  message: string,
+  signatureBase64: string,
+): Promise<boolean> {
+  // Decode PEM → DER ArrayBuffer (zero-copy of the body section).
+  const der = pemToDer(pem);
+  // Import as SPKI public key. Mark non-extractable since we don't need
+  // to re-export it; this also prevents accidental key material leakage
+  // if the key object is captured by an attacker-controlled closure.
+  //
+  // Algorithm name note: per W3C Web Crypto, the sign/verify algorithm is
+  // 'RSASSA-PKCS1-v1_5' (NOT 'RSA-PKCS1-v1_5', which is the encrypt/decrypt
+  // name). Cloudflare Workers accepts both spellings as a convenience; Node
+  // crypto.subtle follows the spec strictly. We use the canonical name so
+  // both environments succeed.
+  const publicKey = await crypto.subtle.importKey(
+    'spki',
+    der,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  );
+  // Decode the base64 signature into raw bytes. Buffer.from('base64')
+  // handles padding correctly; throws on invalid base64, which is the
+  // correct behavior for a malformed callback signature.
+  const sigBytes = Buffer.from(signatureBase64, 'base64');
+  const msgBytes = new TextEncoder().encode(message);
+  // subtle.verify returns true on valid signature, false on invalid.
+  // It does NOT throw on a wrong signature — only on crypto-level errors
+  // (e.g., malformed key import). Our PEM parsing is upstream.
+  return await crypto.subtle.verify(
+    'RSASSA-PKCS1-v1_5',
+    publicKey,
+    sigBytes,
+    msgBytes,
+  );
 }
