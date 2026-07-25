@@ -269,6 +269,60 @@ qizai v0.13.B.3 — apps/web 视频资源从 CloudFront CDN 切到本地 `public
 
 ---
 
+## [0.15.0] - 2026-07-25
+
+### Highlights
+
+qizai v0.15.0 — commercial close loop: 用户配额耗尽 → 内联 BuyModal → 微信支付 Native 扫码 → quota 自动升级。Predict 页 QUOTA_EXHAUSTED 自动开 modal + NavBar 30s 轮询 QuotaBadge + 5s 轮询订单状态。
+
+- **14 atomic tasks 全部完成** (T01-T14) Subagent-Driven 模式
+- **24 新测试通过**: 8 api integration + 3 unit + 2 users + 3 web api + 4 QuotaBadge + 4 BuyModal + 1 Predict upgrade dialog
+- **api 65/65 tests, web 108/108 tests, 0 TS 错误**
+- **0 banned-copy hits**
+
+### 💰 Features
+
+- **orders 表 + migration 0002** (T01): orders D1 表 + users.plan + users.quota_limit_renew_at 列
+- **env.ts WXPAY_* fields** (T02): 7 个环境变量 + WXPAY_USE_SANDBOX 沙箱开关
+- **wechat-pay.ts** (T03): signV3 / verifyCallbackSignature / unifiedorderNative / queryOrderStatus — Workers crypto 自实现，零 SDK 依赖
+- **quota-upgrade.ts** (T04): atomic SQL UPDATE，订阅 renew_at 累加，加量包叠加
+- **POST /api/checkout/create** (T05): requireAuth + plan 白名单 + unifiedorder 调用 + base64 qr_code_base64
+- **GET /api/checkout/status/:orderId** (T06): B2-style 404 + 自动关闭过期订单
+- **POST /api/checkout/callback** (T07): WXPay server-to-server，验签 (TEST_ bypass)，幂等 paid ack，触发 quota 升级
+- **GET /api/users/me** (T08): quota + plan + renew_at 给前端 QuotaBadge 用
+- **index.ts** (T09): checkoutRouter + usersRouter 挂载
+- **web/api/billing.ts** (T10): createCheckout / pollOrderStatus / getMe 客户端
+- **QuotaBadge.tsx** (T11): NavBar 30s 轮询，颜色规则（red ≤ 5 剩余 / gray 耗尽 / white 正常）
+- **BuyModal.tsx** (T12): 2-tab（订阅 / 加量包），5s 轮询 paid 自动关闭，倒计时
+- **NavBar + Predict 集成** (T13): QuotaBadge 嵌入 NavBar；Predict QUOTA_EXHAUSTED 自动打开 BuyModal
+
+### 🛒 Plans
+
+- **personal_sub**: ¥29/月, +30 quota/month, renew_at = now+30d
+- **team_sub**: ¥299/月, +300 quota/month, renew_at = now+30d
+- **topup_100**: ¥9.9 一次性, +100 quota, renew_at = NULL
+
+### ⚙️ Miscellaneous
+
+- **wrangler.toml**: 新增 WXPAY_NOTIFY_URL + WXPAY_USE_SANDBOX 占位（secret vars 走 wrangler secret put）
+- **wrangler.test.toml**: 添加 TEST_ 前缀的 WXPay creds（QR 走 fetch stub，验签走 TEST_ bypass）
+- **vitest-pool-workers 经验复用**: 用 globalThis.fetch stub 替代 vi.mock（v0.14 T16 经验）
+- **qrCode 占位策略**: 暂时用 base64 编码 code_url（v0.15.1 可换真实 PNG）
+
+### 📐 Architecture Decisions
+
+- **ADR-012** — WeChat Pay Native 扫码 (over JSAPI/小程序)：v0.15.0 用户全在 web，无需小程序 openid
+- **ADR-013** — atomic SQL UPDATE for quota upgrade：D1 单行 update 原生支持并发，无需事务
+- **ADR-014** — callback 幂等通过 status='paid' 检查：wx_transaction_id 上游可能重放，无需去重表
+- **ADR-015** — 套餐 + 加量包双 SKU 混合（订阅可续费累加，加量包可叠加）
+
+### 🛑 Scope Deferred (v0.15.1+)
+
+- 发票 / 退款 / 自动续费 / 团队子账号 / 真实 openid 绑定 / cron 自动关单
+- persona_id 缓存（v0.15.1 目标：LLM 成本降 60-80%）
+- MCN demo 演示页（v0.15.2）
+- i18n 中英双语（v0.15.3）
+
 ## [0.14.0] - 2026-07-25
 
 ### Highlights
