@@ -269,6 +269,46 @@ qizai v0.13.B.3 — apps/web 视频资源从 CloudFront CDN 切到本地 `public
 
 ---
 
+## [0.15.1] - 2026-07-26
+
+### Highlights
+
+qizai v0.15.1 — 关闭 v0.15.0 留下的两个尾巴：**WXPay 回调真验签**（替换 WXPAY_VERIFY_NOT_IMPLEMENTED 占位 stub）+ **启动探针接 `c.env`**（让产线安全门从"看不见"变成"看得见"）。Subagent-Driven 7 任务全完成。
+
+- **7 atomic commits** (T01-T07 + final-review fix): T01 pemToDer + T01 fix (hook review HIGH+MEDIUM+6 LOW) + T02 rsaVerifySha256 + T03 wire + T05 boot middleware + T06 boot-probe tests + T07 final cleanup
+- **104/104 测试通过** (50 api unit + 54 api integration, 新增 21 rsa-verify unit + 3 boot-probe integration)
+- **0 TS 错误**
+- **RSA 真路径 + TEST_ 旁路共存** (TEST_ 沙箱 gate 在产线不绕过)
+
+### 🔐 Security
+
+- **rsa-verify.ts (T01+T02)** — 新文件。`pemToDer(pem)` 严格 PEM 解码（8KB cap / 严格 base64 alphabet / 单 regex BEGIN+END+backreference）+ `rsaVerifySha256(pem, msg, sigB64)` 用 `crypto.subtle.verify('RSASSA-PKCS1-v1_5', ...)` 真 RSA-2048 + SHA-256 验签。Cloudflare Workers + Node 双平台兼容（用规范 sign/verify 名字 `RSASSA-PKCS1-v1_5`，区别于 encrypt/decrypt 用的 `RSA-PKCS1-v1_5`）。
+- **verifyCallbackSignature (T03)** — 替换 `WXPAY_VERIFY_NOT_IMPLEMENTED` 占位 stub。`TEST_` 前缀旁路保留（仅在 `WXPAY_USE_SANDBOX===true` 时生效，prod 不可绕过）；缺证书抛 `WXPAY_PLATFORM_CERT_MISSING`（运维 loud failure，注入 `wrangler secret put WXPAY_PLATFORM_CERT`）。
+- **bootMiddleware (T05)** — Hono middleware 在每个 isolate 首次请求时跑 `parseEnv(c.env)`，**loud console.error 报错但不 throw**（per-route 500 from getEnv(c) 才是 actionable 失败模式；throw 会让整个 worker 503 更糟）。
+- **routes/checkout.ts (T07 cleanup)** — 移除 `WXPAY_VERIFY_NOT_IMPLEMENTED` 的 dead catch 分支（v0.15.1 之后该错误不可能再发生）；catch 块统一处理真实异常（缺证书 / PEM 损坏 / crypto 异常）。
+
+### 📐 Architecture Decisions
+
+- **ADR-016** — Hono middleware 而非 `{ fetch }` wrapper：vitest-pool-workers 0.18 用 `app.request()` 跑集成测试，wrap 会破坏 test infra。
+- **ADR-017** — `RSASSA-PKCS1-v1_5` (sign/verify) vs `RSA-PKCS1-v1_5` (encrypt/decrypt)：规范上两个不同的算法名，CF Workers 双兼容但 Node 严格用规范名。
+- **ADR-018** — bootMiddleware log-only：observability-first，throw 会把整个 worker 拉成 503 攻击面更大。
+- **ADR-019** — PEM 周围空白 trim 在 `pemToDer` 入口处：与 openssl / Python cryptography / Go encoding/pem 行为一致；测试加了一条 contract-update 用例显式记录。
+
+### 🧪 Test Coverage Notes
+
+- rsa-verify: 14 (T01) + 7 (T02) = 21 个 unit tests（覆盖 happy / 畸形 PEM / 攻击模式：8KB cap / 前后空白 / 坏 base64 / 标签错位 / 顺序倒置）
+- wechat-pay: 7 verifyCallbackSignature 单元 + 9 signV3 = 16 个 unit tests（TEST_ 旁路 gate + 真 cert + 真签名 round-trip）
+- boot-probe: 3 个 integration tests（placeholder JWT_SECRET / prod+sandbox / JWT_SECRET < 32 字节）
+
+### 🛑 Scope Deferred (v0.15.2+)
+
+- encrypted resource callback ciphertext decoding（v0.15.0 MVP 用 plain JSON + `sensitive_data=noenc`，prod 切真加密是 v0.15.2）
+- WXPay 平台证书自动下载 + 缓存（v0.15.2 计划：按 serial 缓存到 KV）
+- replay-protection (timestamp 新鲜度 check)
+- QR code 真实 PNG（v0.15.0 用 base64-encoded data URL 占位）
+
+---
+
 ## [0.15.0] - 2026-07-25
 
 ### Highlights
