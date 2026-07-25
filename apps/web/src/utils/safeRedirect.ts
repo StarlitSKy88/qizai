@@ -21,7 +21,15 @@
  */
 export function safeRedirect(raw: string | null, fallback = '/predict'): string {
   if (!raw) return fallback;
-  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) {
+  // Defense in depth: reject protocol-relative (//evil.com), backslash
+  // variants (which some browsers normalize to '/'), and NUL-byte payloads
+  // (which can truncate URL parsing in older browsers / proxies).
+  if (
+    !raw.startsWith('/') ||
+    raw.startsWith('//') ||
+    raw.includes('\\') ||
+    raw.includes('\0')
+  ) {
     return fallback;
   }
   return raw;
