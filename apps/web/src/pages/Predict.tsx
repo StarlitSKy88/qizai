@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { apiFetch, consumeSse } from '../api/client';
+import BuyModal from '../components/BuyModal';
 
 export default function Predict() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export default function Predict() {
   const [title, setTitle] = useState(initialTitle);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showBuyModal, setShowBuyModal] = useState(false);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -60,6 +62,7 @@ export default function Predict() {
         const message = errBody.message;
         if (code === 'QUOTA_EXHAUSTED') {
           setErrorMessage(`${message ?? '本月配额已用完'} → 升级 ¥29 套餐`);
+          setShowBuyModal(true);
         } else if (code === 'AUTH_REQUIRED' || code === 'AUTH_FAILED') {
           navigate('/login?redirect=/predict');
           return;
@@ -171,6 +174,8 @@ export default function Predict() {
           </p>
         </div>
       </div>
+
+      {showBuyModal && <BuyModal onClose={() => setShowBuyModal(false)} />}
     </div>
   );
 }

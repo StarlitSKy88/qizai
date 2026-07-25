@@ -210,5 +210,8 @@ describe('Predict', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('本月配额已用完');
     expect(alert).toHaveTextContent('¥29');
+    // T13: QUOTA_EXHAUSTED also opens the inline BuyModal so users can
+    // upgrade without leaving the page.
+    expect(await screen.findByRole('dialog', { name: '购买套餐' })).toBeInTheDocument();
   });
 });
