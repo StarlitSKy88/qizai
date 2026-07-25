@@ -82,6 +82,19 @@ describe('applyQuotaUpgrade', () => {
       .bind(userId)
       .first<any>();
     expect(user.quota_limit).toBe(330); // 30 base + 3*100
+    // Each successful grant must have stamped quota_granted_at on its
+    // order row. If a regression accidentally UPDATEd the wrong column
+    // (e.g. paid_at instead of quota_granted_at), the user.quota_limit
+    // check above would still pass but the CAS column would be NULL —
+    // pin both so the column write is also exercised.
+    const stamped = await env.DB
+      .prepare(
+        `SELECT COUNT(*) AS c FROM orders
+          WHERE user_id = ? AND quota_granted_at IS NOT NULL`,
+      )
+      .bind(userId)
+      .first<{ c: number }>();
+    expect(stamped.c).toBe(3);
   });
 
   it('team_sub adds 300 quota', async () => {

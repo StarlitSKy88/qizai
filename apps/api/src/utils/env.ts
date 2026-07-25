@@ -38,7 +38,13 @@ const NODE_ENV_ALIASES: Record<string, 'production' | 'staging' | 'test' | 'deve
 function normalizeNodeEnv(raw: unknown): 'production' | 'staging' | 'test' | 'development' {
   if (typeof raw !== 'string') return 'development';
   const key = raw.trim().toLowerCase();
-  return NODE_ENV_ALIASES[key] ?? 'development';
+  // Use hasOwnProperty so a hypothetical future refactor that reads from
+  // env.NODE_ENV_ALIASES (instead of the module-level const) cannot leak
+  // through the prototype chain. Direct property access on a const is
+  // safe today; this is regression armor.
+  return Object.prototype.hasOwnProperty.call(NODE_ENV_ALIASES, key)
+    ? NODE_ENV_ALIASES[key]
+    : 'development';
 }
 
 export function parseEnv(raw: unknown): AppEnv {

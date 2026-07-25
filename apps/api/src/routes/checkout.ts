@@ -135,7 +135,36 @@ checkoutRouter.post('/callback', async (c) => {
   if (!sig || !ts || !nonce || !serial) {
     return c.json({ code: 'INVALID_SIGNATURE' }, 401);
   }
-  const ok = await verifyCallbackSignature(ts, nonce, rawBody, sig, serial, env);
+  // verifyCallbackSignature throws WXPAY_VERIFY_NOT_IMPLEMENTED on the prod
+  // path (real RSA verifier is v0.15.1 work). Without this try/catch, every
+  // prod callback would surface as an uncaught 500 via Hono's default error
+  // handler — WXPay treats 5xx as retryable, so a misconfigured prod with
+  // WXPAY_USE_SANDBOX=false would generate a retry storm with no actionable
+  // log. We catch the sentinel here and return a controlled 'FAIL' 500 so
+  // WXPay retries cleanly until v0.15.1 ships the real verifier; ops can
+  // grep for WXPAY_VERIFY_NOT_IMPLEMENTED to confirm the gap is the
+  // expected v0.15.0 stub rather than a real config issue.
+  let ok: boolean;
+  try {
+    ok = await verifyCallbackSignature(ts, nonce, rawBody, sig, serial, env);
+  } catch (verifyErr) {
+    const message = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+    if (message === 'WXPAY_VERIFY_NOT_IMPLEMENTED') {
+      console.error('[checkout/callback] verify stub not implemented (v0.15.0)', {
+        certSerial: serial,
+        timestamp: ts,
+      });
+      return c.text('FAIL', 500);
+    }
+    // Unexpected verification error (network blip, crypto failure). Same
+    // 500 treatment — WXPay retries, we don't ack partial work.
+    console.error('[checkout/callback] verifyCallbackSignature threw unexpectedly', {
+      certSerial: serial,
+      timestamp: ts,
+      err: message,
+    });
+    return c.text('FAIL', 500);
+  }
   if (!ok) return c.json({ code: 'INVALID_SIGNATURE' }, 401);
 
   let payload: { out_trade_no?: string; transaction_id?: string; trade_state?: string };
@@ -197,14 +226,26 @@ checkoutRouter.post('/callback', async (c) => {
     });
     let rolledBack = false;
     try {
-      // CAS rollback flips status AND clears wx_transaction_id + paid_at so
-      // the next WXPay retry has a clean slate. Preserving tx_id on rollback
-      // would silently overwrite the new (correct) tx_id on the next attempt
-      // and lose the audit trail between attempts.
+      // CAS rollback flips status AND clears wx_transaction_id + paid_at
+      // AND quota_granted_at so the next WXPay retry has a clean slate.
+      // CRITICAL (round-5 review): quota_granted_at MUST also be reset.
+      // If applyQuotaUpgrade's order CAS succeeded (quota_granted_at set)
+      // but the users UPDATE threw (D1 transient, network blip), the
+      // rollback flips status back to 'pending' — but if quota_granted_at
+      // stayed set, the next WXPay retry would see
+      // `quota_granted_at IS NOT NULL` in applyQuotaUpgrade's CAS and
+      // throw QuotaUpgradeError. The user would then be stuck:
+      // order is back to 'pending' but quota grant can never re-fire,
+      // silently stranding a paid customer with no quota. Preserving
+      // tx_id/paid_at on rollback would similarly overwrite the next
+      // attempt's tx_id and lose the audit trail.
       const rb = await env.DB
         .prepare(
           `UPDATE orders
-             SET status = 'pending', wx_transaction_id = NULL, paid_at = NULL
+             SET status = 'pending',
+                 wx_transaction_id = NULL,
+                 paid_at = NULL,
+                 quota_granted_at = NULL
            WHERE id = ? AND status = 'paid'`,
         )
         .bind(row.id)

@@ -26,6 +26,11 @@ describe('0002 migration schema', () => {
     expect(names).toContain('created_at');
     expect(names).toContain('paid_at');
     expect(names).toContain('expires_at');
+    // quota_granted_at is the CAS column consumed by applyQuotaUpgrade.
+    // If a future migration-edit drops it, the unit test would still pass
+    // but prod callbacks would silently break at runtime. Pin the column
+    // here so a regression breaks the test, not the customer.
+    expect(names).toContain('quota_granted_at');
   });
 
   it('adds plan + quota_limit_renew_at columns to users', async () => {
