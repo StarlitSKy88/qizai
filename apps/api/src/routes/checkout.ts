@@ -144,32 +144,22 @@ checkoutRouter.post('/callback', wxpayCallbackRateLimit, async (c) => {
   if (!sig || !ts || !nonce || !serial) {
     return c.json({ code: 'INVALID_SIGNATURE' }, 401);
   }
-  // verifyCallbackSignature throws WXPAY_VERIFY_NOT_IMPLEMENTED on the prod
-  // path (real RSA verifier is v0.15.1 work). Without this try/catch, every
-  // prod callback would surface as an uncaught 500 via Hono's default error
-  // handler — WXPay treats 5xx as retryable, so a misconfigured prod with
-  // WXPAY_USE_SANDBOX=false would generate a retry storm with no actionable
-  // log. We catch the sentinel here and return a controlled 'FAIL' 500 so
-  // WXPay retries cleanly until v0.15.1 ships the real verifier; ops can
-  // grep for WXPAY_VERIFY_NOT_IMPLEMENTED to confirm the gap is the
-  // expected v0.15.0 stub rather than a real config issue.
+  // verifyCallbackSignature (v0.15.1+) returns boolean for normal failures
+  // and throws only on hard configuration errors (WXPAY_PLATFORM_CERT_MISSING,
+  // malformed PEM, crypto-level errors). Without try/catch, a missing cert
+  // in prod would surface as an uncaught 500 via Hono's default error
+  // handler — WXPay treats 5xx as retryable, generating a retry storm with
+  // no actionable log. We catch here, log with full context, and return
+  // 'FAIL' 500 so WXPay retries cleanly while ops inspects the log.
   let ok: boolean;
   try {
     ok = await verifyCallbackSignature(ts, nonce, rawBody, sig, serial, env);
   } catch (verifyErr) {
-    const message = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
-    if (message === 'WXPAY_VERIFY_NOT_IMPLEMENTED') {
-      console.error('[checkout/callback] verify stub not implemented (v0.15.0)', {
-        certSerial: serial,
-        timestamp: ts,
-      });
-      return c.text('FAIL', 500);
-    }
-    // Unexpected verification error (network blip, crypto failure). Same
+    // Verification error (missing cert, malformed PEM, crypto failure).
     // 500 treatment — WXPay retries, we don't ack partial work. Log the
     // full stack so ops can trace the root cause; the message alone is
     // often too terse to debug.
-    console.error('[checkout/callback] verifyCallbackSignature threw unexpectedly', {
+    console.error('[checkout/callback] verifyCallbackSignature threw', {
       certSerial: serial,
       timestamp: ts,
       err: verifyErr instanceof Error ? verifyErr.message : String(verifyErr),
