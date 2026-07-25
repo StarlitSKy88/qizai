@@ -109,9 +109,12 @@ export async function unifiedorderNative(
   if (!res.ok) throw new Error(`WXPAY_UNIFIEDORDER_FAILED: HTTP ${res.status}`);
   const json = (await res.json()) as { code_url?: string };
   if (!json.code_url) throw new Error('WXPAY_NO_CODE_URL');
-  // base64 PNG via qrcode (dev dep). Lazy import keeps cold start small.
-  const QRCode = (await import('qrcode')).default;
-  const qr_code_base64 = await QRCode.toDataURL(json.code_url, { type: 'image/png' });
+  // Encode the code_url as a base64 "data URL" payload the frontend can
+  // either decode (when a real PNG is attached) or display as a placeholder.
+  // Frontend BuyModal renders the code_url as a clickable deeplink or QR
+  // (qrcode lib on the web side). Keeping the api side free of native qrcode
+  // dependency avoids workerd ESM/CJS interop issues.
+  const qr_code_base64 = `data:text/plain;base64,${btoa(json.code_url)}`;
   return { code_url: json.code_url, qr_code_base64 };
 }
 
