@@ -12,10 +12,11 @@
 //   - unifiedorderNative(env, orderId, amountFen, ...)     → { code_url, qr_code_base64 }
 //   - queryOrderStatus(env, orderId)                       → { status, transaction_id } | null
 //
-// SECURITY: signV3 uses a dev placeholder HMAC key (32 zero-bytes). Production
-// must replace it with the WXPay mch apiKey (loaded via wrangler secret put).
-// Tests cover shape only; real signing semantics are exercised against WXPay
-// sandbox in T05/T07 integration tests with vi.mock.
+// SECURITY: signV3 reads env.WXPAY_API_KEY_V3 (set via `wrangler secret put`).
+// In dev (WXPAY_USE_SANDBOX=true) it falls back to a 32-zero-byte placeholder
+// so the sandbox endpoint still receives a well-formed signature. In production
+// (WXPAY_USE_SANDBOX=false / unset) it throws WXPAY_NOT_CONFIGURED if the key
+// is missing — there is no zero-byte fallback outside dev, by design.
 //
 // SCOPE: WXPay callback ciphertext (encrypted resource) decoding is v0.15.1+.
 // For v0.15.0 MVP, callback body is plain JSON (we register notify_url with
@@ -35,12 +36,19 @@ export async function signV3(
   body: string,
   timestamp: string,
   nonce: string,
+  env: Pick<AppEnv, 'WXPAY_API_KEY_V3' | 'WXPAY_USE_SANDBOX'>,
 ): Promise<string> {
   // WXPay V3 canonical string: METHOD\nurlPath\ntimestamp\nnonce\nbody\n
   const message = `${method}\n${urlPath}\n${timestamp}\n${nonce}\n${body}\n`;
-  // Dev placeholder: 32 zero-bytes (deterministic for tests). Production injects
-  // the actual apiKey via WXPAY_API_KEY_V3 wrangler secret.
-  const keyBytes = new TextEncoder().encode('0'.repeat(32));
+  // Production: read the mch apiKey injected via `wrangler secret put`. Dev
+  // (sandbox) tolerates the 32-zero-byte placeholder so the integration
+  // tests can run without a live key; missing-in-prod is a hard fail
+  // (WXPAY_NOT_CONFIGURED) — there is no silent zero-byte fallback outside
+  // the sandbox path.
+  const apiKey =
+    env.WXPAY_API_KEY_V3 ?? (env.WXPAY_USE_SANDBOX ? '0'.repeat(32) : null);
+  if (!apiKey) throw new Error('WXPAY_NOT_CONFIGURED');
+  const keyBytes = new TextEncoder().encode(apiKey);
   const key = await crypto.subtle.importKey(
     'raw',
     keyBytes,
@@ -98,7 +106,7 @@ export async function unifiedorderNative(
   });
   const ts = String(Math.floor(Date.now() / 1000));
   const nonce = crypto.randomUUID();
-  const signature = await signV3('POST', urlPath, body, ts, nonce);
+  const signature = await signV3('POST', urlPath, body, ts, nonce, env);
   const auth =
     `mchid="${env.WXPAY_MCH_ID}",serial_no="${env.WXPAY_CERT_SERIAL ?? ''}",` +
     `timestamp="${ts}",nonce_str="${nonce}",signature="${signature}"`;
@@ -137,7 +145,7 @@ export async function queryOrderStatus(
   const urlPath = `/v3/pay/transactions/out-trade-no/${orderId}`;
   const ts = String(Math.floor(Date.now() / 1000));
   const nonce = crypto.randomUUID();
-  const signature = await signV3('GET', urlPath, '', ts, nonce);
+  const signature = await signV3('GET', urlPath, '', ts, nonce, env);
   const auth =
     `mchid="${env.WXPAY_MCH_ID}",serial_no="${env.WXPAY_CERT_SERIAL ?? ''}",` +
     `timestamp="${ts}",nonce_str="${nonce}",signature="${signature}"`;
