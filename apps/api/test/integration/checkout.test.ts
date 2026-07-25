@@ -89,3 +89,68 @@ describe('checkout POST /create', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('checkout GET /status/:orderId', () => {
+  beforeEach(async () => {
+    await env.DB.exec('DELETE FROM orders; DELETE FROM reports; DELETE FROM users; DELETE FROM rate_limits;');
+  });
+
+  async function seedOrder(userId: string, opts: { status?: string; expiresAt?: number; paidAt?: number } = {}) {
+    const orderId = crypto.randomUUID();
+    await env.DB
+      .prepare(
+        `INSERT INTO orders (id, user_id, plan, amount_fen, status, created_at, expires_at, paid_at)
+         VALUES (?, ?, 'personal_sub', 2900, ?, ?, ?, ?)`,
+      )
+      .bind(
+        orderId,
+        userId,
+        opts.status ?? 'pending',
+        Math.floor(Date.now() / 1000),
+        opts.expiresAt ?? Math.floor(Date.now() / 1000) + 1800,
+        opts.paidAt ?? null,
+      )
+      .run();
+    return orderId;
+  }
+
+  it('returns pending status for own order', async () => {
+    const { userId, auth } = await setupUser('status1@b.com');
+    const orderId = await seedOrder(userId, { status: 'pending' });
+    const res = await app.request(`/api/checkout/status/${orderId}`, {
+      headers: { ...auth },
+    }, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.status).toBe('pending');
+    expect(body.paidAt).toBeNull();
+  });
+
+  it('returns 404 NOT_FOUND for another user order (B2 leak fix)', async () => {
+    const { userId: ownerId } = await setupUser('owner@b.com');
+    const { auth: otherAuth } = await setupUser('other@b.com');
+    const orderId = await seedOrder(ownerId, { status: 'pending' });
+    const res = await app.request(`/api/checkout/status/${orderId}`, {
+      headers: { ...otherAuth },
+    }, env);
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as any;
+    expect(body.code).toBe('NOT_FOUND');
+  });
+
+  it('auto-closes expired pending orders', async () => {
+    const { userId, auth } = await setupUser('expired@b.com');
+    const orderId = await seedOrder(userId, {
+      status: 'pending',
+      expiresAt: Math.floor(Date.now() / 1000) - 60, // expired 1 min ago
+    });
+    const res = await app.request(`/api/checkout/status/${orderId}`, {
+      headers: { ...auth },
+    }, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.status).toBe('closed');
+    const row = await env.DB.prepare('SELECT status FROM orders WHERE id = ?').bind(orderId).first<any>();
+    expect(row.status).toBe('closed');
+  });
+});

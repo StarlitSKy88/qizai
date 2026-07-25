@@ -71,3 +71,38 @@ checkoutRouter.post('/create', requireAuth, async (c) => {
     return c.json({ code: 'WXPAY_ERROR', message: String(err) }, 500);
   }
 });
+
+// T06 — poll order status. B2-style 404 (missing OR not-owned unified as 404
+// to prevent id enumeration). Also auto-closes expired pending orders.
+checkoutRouter.get('/status/:orderId', requireAuth, async (c) => {
+  const user = getUser(c);
+  const env = getEnv(c);
+  if (!env.DB) return c.json({ code: 'DB_NOT_CONFIGURED' }, 500);
+  const orderId = c.req.param('orderId');
+
+  const row = await env.DB
+    .prepare('SELECT id, user_id, status, paid_at, expires_at FROM orders WHERE id = ?')
+    .bind(orderId)
+    .first<{
+      id: string;
+      user_id: string;
+      status: string;
+      paid_at: number | null;
+      expires_at: number | null;
+    }>();
+
+  if (!row || row.user_id !== user.sub) {
+    return c.json({ code: 'NOT_FOUND' }, 404);
+  }
+
+  // Auto-close expired pending orders so the frontend can show "closed".
+  if (row.status === 'pending' && row.expires_at && row.expires_at < Math.floor(Date.now() / 1000)) {
+    await env.DB
+      .prepare(`UPDATE orders SET status = 'closed' WHERE id = ? AND status = 'pending'`)
+      .bind(orderId)
+      .run();
+    return c.json({ status: 'closed', paidAt: row.paid_at });
+  }
+
+  return c.json({ status: row.status, paidAt: row.paid_at });
+});
