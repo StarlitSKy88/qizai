@@ -144,12 +144,23 @@ checkoutRouter.post('/callback', async (c) => {
   // Idempotent: already paid → ack, no quota change
   if (row.status === 'paid') return c.text('SUCCESS', 200);
 
-  await env.DB
+  // CAS: only flip pending → paid. Concurrent WXPay retries for the same
+  // out_trade_no will see meta.changes === 0 for all but the first writer;
+  // subsequent writers ack 200 without re-running applyQuotaUpgrade. This
+  // mirrors the auto-close pattern on line 101 and is the canonical fix for
+  // the "double quota apply" race surfaced by the v0.15.0 security review.
+  const res = await env.DB
     .prepare(
-      `UPDATE orders SET status = 'paid', wx_transaction_id = ?, paid_at = ? WHERE id = ?`,
+      `UPDATE orders
+         SET status = 'paid', wx_transaction_id = ?, paid_at = ?
+       WHERE id = ? AND status = 'pending'`,
     )
     .bind(payload.transaction_id ?? null, Math.floor(Date.now() / 1000), row.id)
     .run();
+  if (res.meta?.changes !== 1) {
+    // Lost the race — another callback already paid this order. Ack and bail.
+    return c.text('SUCCESS', 200);
+  }
 
   await applyQuotaUpgrade(env.DB, row.user_id, row.plan as OrderPlan);
   return c.text('SUCCESS', 200);
