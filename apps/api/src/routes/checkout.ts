@@ -66,9 +66,22 @@ checkoutRouter.post('/create', requireAuth, async (c) => {
       .run();
     return c.json({ orderId, qrCodeBase64: qr_code_base64, amountFen, expiresAt });
   } catch (err) {
-    // Rollback order so user can retry cleanly
-    await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(orderId).run();
-    return c.json({ code: 'WXPAY_ERROR', message: String(err) }, 500);
+    // Rollback order so user can retry cleanly. Log the underlying error
+    // server-side but never echo it to the client — `String(err)` can
+    // include cert paths, env names, or internal D1 queries depending on
+    // the exception source, which is an info-leak vector.
+    console.error('[checkout/create] WXPay unifiedorder failed', {
+      orderId,
+      userId: user.sub,
+      err: err instanceof Error ? err.message : String(err),
+    });
+    try {
+      await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(orderId).run();
+    } catch {
+      // best-effort cleanup; the order will be picked up by the auto-close
+      // sweep on the next /status check once expires_at passes
+    }
+    return c.json({ code: 'WXPAY_ERROR' }, 500);
   }
 });
 
@@ -165,18 +178,44 @@ checkoutRouter.post('/callback', async (c) => {
   // CAS committed the paid state. Now run the quota grant — but if it
   // throws (D1 transient, network blip, exception in applyQuotaUpgrade),
   // we must NOT leave the user paid-without-quota. Roll status back to
-  // 'pending' so the next WXPay retry (or our reconciliation loop) can
-  // re-issue the grant. Ack 200 either way so WXPay doesn't retry-storm
-  // us, but the order is now eligible for a manual retry path.
+  // 'pending' so the next WXPay retry can re-issue the grant.
+  //
+  // The rollback UPDATE has its own CAS (status='paid') and we check
+  // meta.changes: if the rollback itself misses (someone else flipped the
+  // row, or D1 is unhappy) we ack non-200 so WXPay retries — better than
+  // silently stranding a paid order with no quota. Rollback success → ack
+  // 200 (we've restored the original pending state, WXPay should retry the
+  // callback and we'll re-enter the CAS path on the next attempt).
   try {
     await applyQuotaUpgrade(env.DB, row.user_id, row.plan as OrderPlan);
   } catch (quotaErr) {
-    await env.DB
-      .prepare(
-        `UPDATE orders SET status = 'pending' WHERE id = ? AND status = 'paid'`,
-      )
-      .bind(row.id)
-      .run();
+    console.error('[checkout/callback] quota upgrade failed, rolling back', {
+      orderId: row.id,
+      userId: row.user_id,
+      plan: row.plan,
+      err: quotaErr instanceof Error ? quotaErr.message : String(quotaErr),
+    });
+    let rolledBack = false;
+    try {
+      const rb = await env.DB
+        .prepare(
+          `UPDATE orders SET status = 'pending' WHERE id = ? AND status = 'paid'`,
+        )
+        .bind(row.id)
+        .run();
+      rolledBack = rb.meta?.changes === 1;
+    } catch (rbErr) {
+      console.error('[checkout/callback] rollback UPDATE itself failed', {
+        orderId: row.id,
+        err: rbErr instanceof Error ? rbErr.message : String(rbErr),
+      });
+    }
+    if (!rolledBack) {
+      // Could not safely restore pending state — force WXPay to retry by
+      // returning non-200. The order is in an unknown state; ops should
+      // grep for the console.error above to reconcile.
+      return c.text('FAIL', 500);
+    }
     return c.text('SUCCESS', 200);
   }
   return c.text('SUCCESS', 200);

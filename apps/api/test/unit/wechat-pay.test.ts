@@ -7,7 +7,7 @@
 //   in unit; integration tests in T05/T07 cover them with vi.mock)
 
 import { describe, it, expect } from 'vitest';
-import { signV3 } from '../../src/utils/wechat-pay';
+import { signV3, verifyCallbackSignature } from '../../src/utils/wechat-pay';
 
 const DEV_ENV = { WXPAY_API_KEY_V3: 'test-api-key-32-bytes-long-pad!!', WXPAY_USE_SANDBOX: true };
 
@@ -60,5 +60,33 @@ describe('wechat-pay.signV3', () => {
       WXPAY_USE_SANDBOX: true,
     });
     expect(sig).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('wechat-pay.verifyCallbackSignature bypass gate', () => {
+  // CI lock: locks the prod bypass gate. If a future contributor removes
+  // the env.WXPAY_USE_SANDBOX check (or short-circuits the function back
+  // to "always return true"), these tests fail and force a manual review.
+  const prodEnv = { WXPAY_USE_SANDBOX: false };
+  const sandboxEnv = { WXPAY_USE_SANDBOX: true };
+
+  it('bypasses on TEST_ serial in sandbox (test fixture path)', async () => {
+    const ok = await verifyCallbackSignature('t', 'n', 'b', 'sig', 'TEST_anything', sandboxEnv);
+    expect(ok).toBe(true);
+  });
+
+  it('rejects TEST_ serial in prod (security gate)', async () => {
+    const ok = await verifyCallbackSignature('t', 'n', 'b', 'sig', 'TEST_anything', prodEnv);
+    expect(ok).toBe(false);
+  });
+
+  it('rejects non-TEST_ serial in sandbox', async () => {
+    const ok = await verifyCallbackSignature('t', 'n', 'b', 'sig', 'WXPAY_REAL_SERIAL_12345', sandboxEnv);
+    expect(ok).toBe(false);
+  });
+
+  it('rejects non-TEST_ serial in prod', async () => {
+    const ok = await verifyCallbackSignature('t', 'n', 'b', 'sig', 'WXPAY_REAL_SERIAL_12345', prodEnv);
+    expect(ok).toBe(false);
   });
 });

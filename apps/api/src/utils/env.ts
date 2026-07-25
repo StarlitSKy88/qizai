@@ -25,11 +25,30 @@ export function parseEnv(raw: Record<string, unknown>): AppEnv {
     throw new Error('JWT_SECRET is required');
   }
   const jwtSecret = raw.JWT_SECRET as string;
-  if ((raw.NODE_ENV as string) === 'production' && (jwtSecret === 'dev-secret-replace-in-prod' || jwtSecret === 'test-secret-isolated-from-dev')) {
+  const nodeEnv = (raw.NODE_ENV as string) ?? 'development';
+  if (nodeEnv === 'production' && (jwtSecret === 'dev-secret-replace-in-prod' || jwtSecret === 'test-secret-isolated-from-dev')) {
     throw new Error('JWT_SECRET must be set via `wrangler secret put JWT_SECRET` in production; placeholder value detected');
   }
+  // Permissive boolean parser: wrangler [vars] blocks sometimes serialize
+  // booleans as the string "true" / "True" / "TRUE". Accept any case so a
+  // misconfigured prod doesn't silently default to sandbox=false (or vice
+  // versa) and disable the bypass gate in an unexpected place.
+  const sandboxRaw = raw.WXPAY_USE_SANDBOX;
+  const useSandbox =
+    typeof sandboxRaw === 'boolean'
+      ? sandboxRaw
+      : typeof sandboxRaw === 'string'
+      ? sandboxRaw.toLowerCase() === 'true'
+      : false;
+  // Defense in depth: a production deployment with WXPAY_USE_SANDBOX=true
+  // would route every signed WXPay request to the sandbox host with a
+  // 32-zero-byte HMAC key fallback — silently broken and trivially
+  // forgeable. Refuse at boot so the misconfig is loud, not silent.
+  if (nodeEnv === 'production' && useSandbox) {
+    throw new Error('WXPAY_USE_SANBOX=true is not allowed in production; signV3 falls back to a 32-zero-byte HMAC key in sandbox mode');
+  }
   return {
-    NODE_ENV: (raw.NODE_ENV as string) ?? 'development',
+    NODE_ENV: nodeEnv,
     JWT_SECRET: jwtSecret,
     ALIBABA_BAILIAN_API_KEY: raw.ALIBABA_BAILIAN_API_KEY as string | undefined,
     FIREWORKS_API_KEY: raw.FIREWORKS_API_KEY as string | undefined,
@@ -41,7 +60,7 @@ export function parseEnv(raw: Record<string, unknown>): AppEnv {
     WXPAY_PLATFORM_CERT: raw.WXPAY_PLATFORM_CERT as string | undefined,
     WXPAY_CERT_SERIAL: raw.WXPAY_CERT_SERIAL as string | undefined,
     WXPAY_NOTIFY_URL: raw.WXPAY_NOTIFY_URL as string | undefined,
-    WXPAY_USE_SANDBOX: (raw.WXPAY_USE_SANDBOX as string) === 'true',
+    WXPAY_USE_SANDBOX: useSandbox,
   };
 }
 
