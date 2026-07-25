@@ -68,6 +68,7 @@ export async function verifyCallbackSignature(
   _body: string,
   _signature: string,
   certSerial: string,
+  env: Pick<AppEnv, 'WXPAY_USE_SANDBOX'>,
 ): Promise<boolean> {
   // Production: load WXPAY_PLATFORM_CERT by serial, RSA-verify signature
   // over `${timestamp}\n${nonce}\n${body}\n` (PKCS#1 v1.5).
@@ -76,7 +77,13 @@ export async function verifyCallbackSignature(
   // verification. This avoids the need for vi.mock in vitest-pool-workers
   // (which lacks module-mock support — see T16 in v0.14 ledger). Production
   // cert serials from WXPay are hex/base32, never prefixed with TEST_.
-  if (certSerial.startsWith('TEST_')) return true;
+  //
+  // SECURITY: the bypass is gated on WXPAY_USE_SANDBOX===true so an attacker
+  // who can reach /api/checkout/callback in prod cannot forge the
+  // Wechatpay-Serial header with a TEST_ prefix to skip signature
+  // verification. The serial header is attacker-controlled; this gate is
+  // the only thing preventing a bypass of HMAC+PKCS#1 v1.5 RSA.
+  if (env.WXPAY_USE_SANDBOX && certSerial.startsWith('TEST_')) return true;
   return false;
 }
 

@@ -19,7 +19,7 @@ WXPAY_PRIVATE_KEY = '-----BEGIN PRIVATE KEY----- TEST -----END PRIVATE KEY-----'
 WXPAY_PLATFORM_CERT = '-----BEGIN CERTIFICATE----- TEST -----END CERTIFICATE-----'
 WXPAY_CERT_SERIAL = "TEST_SERIAL_0001"
 WXPAY_NOTIFY_URL = "https://api.qizai.app/api/checkout/callback"
-WXPAY_USE_SANDBOX = "false"
+WXPAY_USE_SANDBOX = "true"
 
 [[d1_databases]]
 binding = "DB"

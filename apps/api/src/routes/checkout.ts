@@ -122,7 +122,7 @@ checkoutRouter.post('/callback', async (c) => {
   if (!sig || !ts || !nonce || !serial) {
     return c.json({ code: 'INVALID_SIGNATURE' }, 401);
   }
-  const ok = await verifyCallbackSignature(ts, nonce, rawBody, sig, serial);
+  const ok = await verifyCallbackSignature(ts, nonce, rawBody, sig, serial, env);
   if (!ok) return c.json({ code: 'INVALID_SIGNATURE' }, 401);
 
   let payload: { out_trade_no?: string; transaction_id?: string; trade_state?: string };
@@ -162,6 +162,22 @@ checkoutRouter.post('/callback', async (c) => {
     return c.text('SUCCESS', 200);
   }
 
-  await applyQuotaUpgrade(env.DB, row.user_id, row.plan as OrderPlan);
+  // CAS committed the paid state. Now run the quota grant — but if it
+  // throws (D1 transient, network blip, exception in applyQuotaUpgrade),
+  // we must NOT leave the user paid-without-quota. Roll status back to
+  // 'pending' so the next WXPay retry (or our reconciliation loop) can
+  // re-issue the grant. Ack 200 either way so WXPay doesn't retry-storm
+  // us, but the order is now eligible for a manual retry path.
+  try {
+    await applyQuotaUpgrade(env.DB, row.user_id, row.plan as OrderPlan);
+  } catch (quotaErr) {
+    await env.DB
+      .prepare(
+        `UPDATE orders SET status = 'pending' WHERE id = ? AND status = 'paid'`,
+      )
+      .bind(row.id)
+      .run();
+    return c.text('SUCCESS', 200);
+  }
   return c.text('SUCCESS', 200);
 });
