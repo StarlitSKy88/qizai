@@ -9,26 +9,26 @@ import { parseEnv } from './utils/env';
 
 const app = new Hono();
 
-// Boot-time env validation. parseEnv is the source of truth for prod-safety
-// gates (placeholder JWT/API key rejection, prod+sandbox combo rejection,
-// JWT_SECRET ≥32-byte strength). Calling it here at module load surfaces
-// misconfigurations immediately on deploy — without this, the guards only
-// fire on the first request via getEnv(c), which means a misconfigured
-// production deploy would still pass `wrangler deploy` and only fail once
-// traffic hits the worker. Fail-fast at boot is the better operator
-// experience. The (c.env ?? {}) fallback keeps local tests working when
-// this module loads outside a request context (vitest-pool-workers
-// does pre-load all routes).
+// Vitest-startup sanity check ONLY. Cloudflare Workers does NOT populate
+// `process.env` from `wrangler secret put` — secrets are bound via the
+// worker context (c.env), not process.env. So in production, this probe
+// sees NODE_ENV=undefined → 'development' and JWT_SECRET=undefined →
+// fallback literal; the prod guards (placeholder JWT, prod+sandbox combo,
+// ≥32-byte strength) never fire here. The real enforcement happens in
+// getEnv(c) on every request, which DOES see c.env. We keep this block so
+// vitest-pool-workers (which pre-loads all routes via import) fails fast
+// if a future contributor breaks the JWT_SECRET shape — but it is NOT
+// a production safety net. v0.15.1 carry-over: wire this probe through
+// the worker module init hook so it sees c.env bindings in prod too.
 try {
   parseEnv({ JWT_SECRET: process.env.JWT_SECRET ?? 'test-secret-isolated-from-dev' });
 } catch (err) {
   // Don't crash the worker boot — just log. The runtime getEnv(c) call
-  // will still enforce the same gates on every request, and this best-
-  // effort probe won't be available in production (c.env is the real
-  // source). The catch is here so a missing JWT_SECRET in local dev
-  // doesn't prevent `vitest` from starting up.
+  // will still enforce the same gates on every request. The catch is here
+  // so a missing JWT_SECRET in local dev doesn't prevent `vitest` from
+  // starting up.
   console.warn(
-    '[index] boot-time parseEnv probe failed; runtime guards will still enforce',
+    '[index] vitest-startup parseEnv sanity check failed; runtime guards still apply',
     err instanceof Error ? err.message : String(err),
   );
 }

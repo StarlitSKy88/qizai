@@ -131,4 +131,92 @@ describe('applyQuotaUpgrade', () => {
       applyQuotaUpgrade(env.DB, userId, 'personal_sub', 'o-pending-1'),
     ).rejects.toBeInstanceOf(QuotaUpgradeError);
   });
+
+  // Round-5/6 review: the rollback UPDATE in checkout.ts:cancel path runs
+  // when applyQuotaUpgrade's order CAS succeeded (quota_granted_at stamped)
+  // but the users UPDATE threw. The rollback SQL must clear quota_granted_at
+  // along with status/wx_transaction_id/paid_at; otherwise the next WXPay
+  // retry sees quota_granted_at IS NOT NULL and the CAS throws, silently
+  // stranding a paid customer with no quota. Pin the SQL behavior here so
+  // a future contributor who accidentally drops quota_granted_at from the
+  // SET clause (or applies the rollback in the wrong order) breaks this
+  // test, not the customer.
+  it('rollback SQL clears status, wx_transaction_id, paid_at, AND quota_granted_at', async () => {
+    const userId = await setupUser('rollback@b.com');
+    const orderId = 'o-rb-1';
+    // Seed a paid order with quota_granted_at already stamped (simulates
+    // the post-CAS state when applyQuotaUpgrade crashed before the users
+    // UPDATE). The seed mirrors the worst case the rollback must handle.
+    await env.DB
+      .prepare(
+        `INSERT INTO orders (id, user_id, plan, amount_fen, status, paid_at, wx_transaction_id, quota_granted_at)
+         VALUES (?, ?, 'personal_sub', 2900, 'paid', ?, 'wx-tx-x', ?)`,
+      )
+      .bind(
+        orderId,
+        userId,
+        Math.floor(Date.now() / 1000),
+        Math.floor(Date.now() / 1000),
+      )
+      .run();
+
+    // Run the rollback SQL verbatim from checkout.ts:244-251.
+    const rb = await env.DB
+      .prepare(
+        `UPDATE orders
+           SET status = 'pending',
+               wx_transaction_id = NULL,
+               paid_at = NULL,
+               quota_granted_at = NULL
+         WHERE id = ? AND status = 'paid'`,
+      )
+      .bind(orderId)
+      .run();
+    expect(rb.meta?.changes).toBe(1);
+
+    const after = await env.DB
+      .prepare(
+        `SELECT status, wx_transaction_id, paid_at, quota_granted_at
+           FROM orders WHERE id = ?`,
+      )
+      .bind(orderId)
+      .first<{
+        status: string;
+        wx_transaction_id: string | null;
+        paid_at: number | null;
+        quota_granted_at: number | null;
+      }>();
+    expect(after.status).toBe('pending');
+    expect(after.wx_transaction_id).toBeNull();
+    expect(after.paid_at).toBeNull();
+    // The whole point of round-5 fix: this MUST be NULL after rollback,
+    // otherwise the next WXPay retry's applyQuotaUpgrade CAS throws.
+    expect(after.quota_granted_at).toBeNull();
+  });
+
+  it('rollback SQL is no-op when status is already non-paid (defense in depth)', async () => {
+    const userId = await setupUser('rollback-noop@b.com');
+    const orderId = 'o-rb-noop-1';
+    // Order is already 'pending' — the rollback WHERE clause filters it out.
+    await env.DB
+      .prepare(
+        `INSERT INTO orders (id, user_id, plan, amount_fen, status, paid_at, wx_transaction_id, quota_granted_at)
+         VALUES (?, ?, 'personal_sub', 2900, 'pending', NULL, NULL, NULL)`,
+      )
+      .bind(orderId, userId)
+      .run();
+
+    const rb = await env.DB
+      .prepare(
+        `UPDATE orders
+           SET status = 'pending',
+               wx_transaction_id = NULL,
+               paid_at = NULL,
+               quota_granted_at = NULL
+         WHERE id = ? AND status = 'paid'`,
+      )
+      .bind(orderId)
+      .run();
+    expect(rb.meta?.changes).toBe(0);
+  });
 });

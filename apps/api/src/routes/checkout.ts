@@ -15,6 +15,7 @@ import { requireAuth, getUser } from '../middleware/auth';
 import { getEnv } from '../utils/env';
 import { unifiedorderNative, verifyCallbackSignature } from '../utils/wechat-pay';
 import { applyQuotaUpgrade, type OrderPlan } from '../utils/quota-upgrade';
+import { rateLimitByIp } from '../middleware/rate-limit';
 
 export const checkoutRouter = new Hono();
 
@@ -122,7 +123,15 @@ checkoutRouter.get('/status/:orderId', requireAuth, async (c) => {
 
 // T07 — WeChat Pay server-to-server callback. No auth; verifies signature,
 // idempotent on already-paid orders, triggers quota upgrade on first SUCCESS.
-checkoutRouter.post('/callback', async (c) => {
+//
+// Rate-limit: 30/min per IP. The legitimate caller is WXPay's own retry
+// scheduler, which paces at ~1 req per few seconds on a small set of
+// fixed IPs. A 30/min budget is well above that ceiling. The bucket
+// defends against an attacker probing /api/checkout/callback with
+// synthetic Wechatpay-* headers to drive D1 SELECTs (line 181 below) and
+// pollute console.error/Logpush via the verify-stub throw path.
+const wxpayCallbackRateLimit = rateLimitByIp('wxpay-callback', 30, 60);
+checkoutRouter.post('/callback', wxpayCallbackRateLimit, async (c) => {
   const env = getEnv(c);
   if (!env.DB) return c.json({ code: 'DB_NOT_CONFIGURED' }, 500);
 
@@ -157,11 +166,14 @@ checkoutRouter.post('/callback', async (c) => {
       return c.text('FAIL', 500);
     }
     // Unexpected verification error (network blip, crypto failure). Same
-    // 500 treatment — WXPay retries, we don't ack partial work.
+    // 500 treatment — WXPay retries, we don't ack partial work. Log the
+    // full stack so ops can trace the root cause; the message alone is
+    // often too terse to debug.
     console.error('[checkout/callback] verifyCallbackSignature threw unexpectedly', {
       certSerial: serial,
       timestamp: ts,
-      err: message,
+      err: verifyErr instanceof Error ? verifyErr.message : String(verifyErr),
+      stack: verifyErr instanceof Error ? verifyErr.stack : undefined,
     });
     return c.text('FAIL', 500);
   }
